@@ -38,25 +38,25 @@ const navigation = [
     name: "Dashboard",
     href: "/dashboard",
     icon: LayoutDashboard,
-    roles: ["REQUESTER", "ACCOUNTING", "BUDGET", "TREASURY", "MAYOR", "ADMIN", "DEPARTMENT_HEAD", "FINANCE_HEAD"]
+    roles: ["REQUESTER", "ACCOUNTING", "BUDGET", "TREASURY", "MAYOR", "ADMIN", "DEPARTMENT_HEAD", "FINANCE_HEAD", "GSO", "HR", "BAC"]
   },
   {
     name: "Disbursements",
     href: "/disbursements",
     icon: FileText,
-    roles: ["REQUESTER", "ACCOUNTING", "BUDGET", "TREASURY", "MAYOR", "ADMIN", "DEPARTMENT_HEAD", "FINANCE_HEAD"]
+    roles: ["REQUESTER", "ACCOUNTING", "BUDGET", "TREASURY", "MAYOR", "ADMIN", "DEPARTMENT_HEAD", "FINANCE_HEAD", "GSO", "HR", "BAC"]
   },
   {
     name: "Create Request",
     href: "/create",
     icon: Plus,
-    roles: ["REQUESTER", "ADMIN"]
+    roles: ["REQUESTER", "ADMIN", "GSO", "HR"]
   },
   {
     name: "Reports",
     href: "/reports",
     icon: BarChart3,
-    roles: ["ACCOUNTING", "BUDGET", "TREASURY", "MAYOR", "ADMIN", "DEPARTMENT_HEAD", "FINANCE_HEAD"]
+    roles: ["ACCOUNTING", "BUDGET", "TREASURY", "MAYOR", "ADMIN", "DEPARTMENT_HEAD", "FINANCE_HEAD", "BAC"]
   },
   {
     name: "User Management",

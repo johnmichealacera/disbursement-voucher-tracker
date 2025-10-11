@@ -35,7 +35,7 @@ export async function POST(
     }
 
     // Check if user can submit this disbursement
-    if (disbursement.createdById !== session.user.id && session.user.role !== "ADMIN") {
+    if (disbursement.createdById !== session.user.id && !["ADMIN", "GSO", "HR"].includes(session.user.role)) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 })
     }
 

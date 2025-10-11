@@ -29,7 +29,8 @@ import {
   Clock,
   CheckCircle,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  Eye
 } from "lucide-react"
 
 interface DisbursementItem {
@@ -45,7 +46,7 @@ interface User {
   name: string
   email: string
   department?: string
-  role?: string
+  role: string
 }
 
 interface Approval {
@@ -59,6 +60,7 @@ interface Approval {
 
 interface AuditTrail {
   id: string
+  userId: string
   action: string
   timestamp: string
   user: User
@@ -174,6 +176,166 @@ export default function DisbursementDetailPage() {
     }
   }
 
+  const handleReview = async () => {
+    if (!disbursement) return
+
+    setIsApproving(true)
+    setError("")
+
+    try {
+      const response = await fetch(`/api/disbursements/${id}/review`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "REVIEWED"
+        }),
+      })
+
+      if (response.ok) {
+        const updatedDisbursement = await response.json()
+        setDisbursement(updatedDisbursement)
+      } else {
+        const errorData = await response.json()
+        setError(errorData.error || "Failed to review voucher")
+      }
+    } catch (error) {
+      console.error("Error reviewing disbursement:", error)
+      setError("Failed to review voucher")
+    } finally {
+      setIsApproving(false)
+    }
+  }
+
+  const handleBacReview = async () => {
+    if (!disbursement) return
+
+    setIsApproving(true)
+    setError("")
+
+    try {
+      const response = await fetch(`/api/disbursements/${id}/bac-review`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "BAC_REVIEWED"
+        }),
+      })
+
+      if (response.ok) {
+        const updatedDisbursement = await response.json()
+        setDisbursement(updatedDisbursement)
+      } else {
+        const errorData = await response.json()
+        setError(errorData.error || "Failed to BAC review voucher")
+      }
+    } catch (error) {
+      console.error("Error BAC reviewing disbursement:", error)
+      setError("Failed to BAC review voucher")
+    } finally {
+      setIsApproving(false)
+    }
+  }
+
+  const handleBudgetReview = async () => {
+    if (!disbursement) return
+
+    setIsApproving(true)
+    setError("")
+
+    try {
+      const response = await fetch(`/api/disbursements/${id}/budget-review`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "BUDGET_REVIEWED"
+        }),
+      })
+
+      if (response.ok) {
+        const updatedDisbursement = await response.json()
+        setDisbursement(updatedDisbursement)
+      } else {
+        const errorData = await response.json()
+        setError(errorData.error || "Failed to Budget review voucher")
+      }
+    } catch (error) {
+      console.error("Error Budget reviewing disbursement:", error)
+      setError("Failed to Budget review voucher")
+    } finally {
+      setIsApproving(false)
+    }
+  }
+
+  const handleAccountingReview = async () => {
+    if (!disbursement) return
+
+    setIsApproving(true)
+    setError("")
+
+    try {
+      const response = await fetch(`/api/disbursements/${id}/accounting-review`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "ACCOUNTING_REVIEWED"
+        }),
+      })
+
+      if (response.ok) {
+        const updatedDisbursement = await response.json()
+        setDisbursement(updatedDisbursement)
+      } else {
+        const errorData = await response.json()
+        setError(errorData.error || "Failed to Accounting review voucher")
+      }
+    } catch (error) {
+      console.error("Error Accounting reviewing disbursement:", error)
+      setError("Failed to Accounting review voucher")
+    } finally {
+      setIsApproving(false)
+    }
+  }
+
+  const handleTreasuryReview = async () => {
+    if (!disbursement) return
+
+    setIsApproving(true)
+    setError("")
+
+    try {
+      const response = await fetch(`/api/disbursements/${id}/treasury-review`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "TREASURY_REVIEWED"
+        }),
+      })
+
+      if (response.ok) {
+        const updatedDisbursement = await response.json()
+        setDisbursement(updatedDisbursement)
+      } else {
+        const errorData = await response.json()
+        setError(errorData.error || "Failed to Treasury review voucher")
+      }
+    } catch (error) {
+      console.error("Error Treasury reviewing disbursement:", error)
+      setError("Failed to Treasury review voucher")
+    } finally {
+      setIsApproving(false)
+    }
+  }
+
   useEffect(() => {
     if (id) {
       fetchDisbursement()
@@ -226,10 +388,10 @@ export default function DisbursementDetailPage() {
   }
 
   const canSubmit = disbursement.status === "DRAFT" && 
-    (disbursement.createdBy.id === session.user.id || session.user.role === "ADMIN")
+    (disbursement.createdBy.id === session.user.id || ["ADMIN", "GSO", "HR"].includes(session.user.role))
 
   const canEdit = disbursement.status === "DRAFT" && 
-    (disbursement.createdBy.id === session.user.id || session.user.role === "ADMIN")
+    (disbursement.createdBy.id === session.user.id || ["ADMIN", "GSO", "HR"].includes(session.user.role))
 
   // Determine approval permissions based on role and current status
   const getApprovalLevel = (role: string): number | null => {
@@ -282,6 +444,131 @@ export default function DisbursementDetailPage() {
     )
 
   const canApproveNow = canApprove && previousLevelsCompleted
+
+  // Mayor review logic
+  const canMayorReview = session.user.role === "MAYOR" && 
+    disbursement && 
+    ["GSO", "HR", "REQUESTER"].includes(disbursement.createdBy.role) &&
+    ["PENDING", "VALIDATED", "APPROVED"].includes(disbursement.status)
+
+  // Check if Mayor has already reviewed this voucher
+  const mayorHasReviewed = disbursement && session.user.role === "MAYOR" &&
+    disbursement.auditTrails.some(trail => 
+      trail.action === "REVIEW" && 
+      trail.userId === session.user.id
+    )
+
+  // Check if Mayor has reviewed this GSO voucher
+  const mayorHasReviewedGso = disbursement && 
+    disbursement.createdBy.role === "GSO" &&
+    disbursement.auditTrails.some(trail => 
+      trail.action === "REVIEW" && 
+      trail.user.role === "MAYOR"
+    )
+
+  // BAC review logic - only for GSO vouchers after Mayor review
+  const canBacReview = session.user.role === "BAC" && 
+    disbursement && 
+    disbursement.createdBy.role === "GSO" &&
+    ["PENDING", "VALIDATED", "APPROVED"].includes(disbursement.status) &&
+    mayorHasReviewedGso
+
+  // Show BAC review button for GSO vouchers (but may be disabled)
+  const showBacReviewButton = session.user.role === "BAC" && 
+    disbursement && 
+    disbursement.createdBy.role === "GSO" &&
+    ["PENDING", "VALIDATED", "APPROVED"].includes(disbursement.status)
+
+  // Check if BAC has reviewed this GSO voucher
+  const bacHasReviewedGso = disbursement && 
+    disbursement.createdBy.role === "GSO" &&
+    disbursement.auditTrails.some(trail => 
+      trail.action === "BAC_REVIEW" && 
+      trail.user.role === "BAC"
+    )
+
+  // Budget review logic - only for GSO vouchers after BAC review
+  const canBudgetReview = session.user.role === "BUDGET" && 
+    disbursement && 
+    disbursement.createdBy.role === "GSO" &&
+    ["PENDING", "VALIDATED", "APPROVED"].includes(disbursement.status) &&
+    bacHasReviewedGso
+
+  // Show Budget review button for GSO vouchers (but may be disabled)
+  const showBudgetReviewButton = session.user.role === "BUDGET" && 
+    disbursement && 
+    disbursement.createdBy.role === "GSO" &&
+    ["PENDING", "VALIDATED", "APPROVED"].includes(disbursement.status)
+
+  // Check if Budget has reviewed this GSO voucher
+  const budgetHasReviewedGso = disbursement && 
+    disbursement.createdBy.role === "GSO" &&
+    disbursement.auditTrails.some(trail => 
+      trail.action === "BUDGET_REVIEW" && 
+      trail.user.role === "BUDGET"
+    )
+
+  // Accounting review logic - only for GSO vouchers after Budget review
+  const canAccountingReview = session.user.role === "ACCOUNTING" && 
+    disbursement && 
+    disbursement.createdBy.role === "GSO" &&
+    ["PENDING", "VALIDATED", "APPROVED"].includes(disbursement.status) &&
+    budgetHasReviewedGso
+
+  // Show Accounting review button for GSO vouchers (but may be disabled)
+  const showAccountingReviewButton = session.user.role === "ACCOUNTING" && 
+    disbursement && 
+    disbursement.createdBy.role === "GSO" &&
+    ["PENDING", "VALIDATED", "APPROVED"].includes(disbursement.status)
+
+  // Check if Accounting has reviewed this GSO voucher
+  const accountingHasReviewedGso = disbursement && 
+    disbursement.createdBy.role === "GSO" &&
+    disbursement.auditTrails.some(trail => 
+      trail.action === "ACCOUNTING_REVIEW" && 
+      trail.user.role === "ACCOUNTING"
+    )
+
+  // Treasury review logic - only for GSO vouchers after Accounting review
+  const canTreasuryReview = session.user.role === "TREASURY" && 
+    disbursement && 
+    disbursement.createdBy.role === "GSO" &&
+    ["PENDING", "VALIDATED", "APPROVED"].includes(disbursement.status) &&
+    accountingHasReviewedGso
+
+  // Show Treasury review button for GSO vouchers (but may be disabled)
+  const showTreasuryReviewButton = session.user.role === "TREASURY" && 
+    disbursement && 
+    disbursement.createdBy.role === "GSO" &&
+    ["PENDING", "VALIDATED", "APPROVED"].includes(disbursement.status)
+
+  // Check if BAC has already reviewed this voucher
+  const bacHasReviewed = disbursement && session.user.role === "BAC" &&
+    disbursement.auditTrails.some(trail => 
+      trail.action === "BAC_REVIEW" && 
+      trail.userId === session.user.id
+    )
+
+  // Check if Budget has already reviewed this voucher
+  const budgetHasReviewed = disbursement && session.user.role === "BUDGET" &&
+    disbursement.auditTrails.some(trail => 
+      trail.action === "BUDGET_REVIEW" && 
+      trail.userId === session.user.id
+    )
+
+  // Check if Accounting has already reviewed this voucher
+  const accountingHasReviewed = disbursement && session.user.role === "ACCOUNTING" &&
+    disbursement.auditTrails.some(trail => 
+      trail.action === "ACCOUNTING_REVIEW" && 
+      trail.userId === session.user.id
+    )
+
+  // Check if Treasury has already reviewed this voucher
+  const treasuryHasReviewed = disbursement && session.user.role === "TREASURY" &&
+    disbursement.auditTrails.some(trail => 
+      trail.action === "TREASURY_REVIEW" && 
+      trail.userId === session.user.id
+    )
 
   return (
     <MainLayout>
@@ -336,6 +623,123 @@ export default function DisbursementDetailPage() {
                   Reject
                 </Button>
               </>
+            )}
+            {canMayorReview && (
+              <Button 
+                onClick={handleReview}
+                disabled={isApproving || mayorHasReviewed}
+                className={mayorHasReviewed 
+                  ? "bg-gray-400 hover:bg-gray-400 cursor-not-allowed" 
+                  : "bg-blue-600 hover:bg-blue-700"
+                }
+              >
+                {mayorHasReviewed ? (
+                  <CheckCircle className="mr-2 h-4 w-4" />
+                ) : (
+                  <Eye className="mr-2 h-4 w-4" />
+                )}
+                {isApproving ? "Processing..." : mayorHasReviewed ? "Reviewed" : "Review"}
+              </Button>
+            )}
+            {showBacReviewButton && (
+              <Button 
+                onClick={handleBacReview}
+                disabled={isApproving || bacHasReviewed || !mayorHasReviewedGso}
+                className={bacHasReviewed 
+                  ? "bg-gray-400 hover:bg-gray-400 cursor-not-allowed" 
+                  : !mayorHasReviewedGso
+                  ? "bg-gray-300 hover:bg-gray-300 cursor-not-allowed"
+                  : "bg-purple-600 hover:bg-purple-700"
+                }
+                title={!mayorHasReviewedGso ? "Waiting for Mayor's review" : ""}
+              >
+                {bacHasReviewed ? (
+                  <CheckCircle className="mr-2 h-4 w-4" />
+                ) : !mayorHasReviewedGso ? (
+                  <Clock className="mr-2 h-4 w-4" />
+                ) : (
+                  <Eye className="mr-2 h-4 w-4" />
+                )}
+                {isApproving ? "Processing..." : 
+                 bacHasReviewed ? "BAC Reviewed" : 
+                 !mayorHasReviewedGso ? "Awaiting Mayor Review" : 
+                 "BAC Review"}
+              </Button>
+            )}
+            {showBudgetReviewButton && (
+              <Button 
+                onClick={handleBudgetReview}
+                disabled={isApproving || budgetHasReviewed || !bacHasReviewedGso}
+                className={budgetHasReviewed 
+                  ? "bg-gray-400 hover:bg-gray-400 cursor-not-allowed" 
+                  : !bacHasReviewedGso
+                  ? "bg-gray-300 hover:bg-gray-300 cursor-not-allowed"
+                  : "bg-orange-600 hover:bg-orange-700"
+                }
+                title={!bacHasReviewedGso ? "Waiting for BAC's review" : ""}
+              >
+                {budgetHasReviewed ? (
+                  <CheckCircle className="mr-2 h-4 w-4" />
+                ) : !bacHasReviewedGso ? (
+                  <Clock className="mr-2 h-4 w-4" />
+                ) : (
+                  <Eye className="mr-2 h-4 w-4" />
+                )}
+                {isApproving ? "Processing..." : 
+                 budgetHasReviewed ? "Budget Reviewed" : 
+                 !bacHasReviewedGso ? "Awaiting BAC Review" : 
+                 "Budget Review"}
+              </Button>
+            )}
+            {showAccountingReviewButton && (
+              <Button 
+                onClick={handleAccountingReview}
+                disabled={isApproving || accountingHasReviewed || !budgetHasReviewedGso}
+                className={accountingHasReviewed 
+                  ? "bg-gray-400 hover:bg-gray-400 cursor-not-allowed" 
+                  : !budgetHasReviewedGso
+                  ? "bg-gray-300 hover:bg-gray-300 cursor-not-allowed"
+                  : "bg-green-600 hover:bg-green-700"
+                }
+                title={!budgetHasReviewedGso ? "Waiting for Budget Office review" : ""}
+              >
+                {accountingHasReviewed ? (
+                  <CheckCircle className="mr-2 h-4 w-4" />
+                ) : !budgetHasReviewedGso ? (
+                  <Clock className="mr-2 h-4 w-4" />
+                ) : (
+                  <Eye className="mr-2 h-4 w-4" />
+                )}
+                {isApproving ? "Processing..." : 
+                 accountingHasReviewed ? "Accounting Reviewed" : 
+                 !budgetHasReviewedGso ? "Awaiting Budget Review" : 
+                 "Accounting Review"}
+              </Button>
+            )}
+            {showTreasuryReviewButton && (
+              <Button 
+                onClick={handleTreasuryReview}
+                disabled={isApproving || treasuryHasReviewed || !accountingHasReviewedGso}
+                className={treasuryHasReviewed 
+                  ? "bg-gray-400 hover:bg-gray-400 cursor-not-allowed" 
+                  : !accountingHasReviewedGso
+                  ? "bg-gray-300 hover:bg-gray-300 cursor-not-allowed"
+                  : "bg-indigo-600 hover:bg-indigo-700"
+                }
+                title={!accountingHasReviewedGso ? "Waiting for Accounting review" : ""}
+              >
+                {treasuryHasReviewed ? (
+                  <CheckCircle className="mr-2 h-4 w-4" />
+                ) : !accountingHasReviewedGso ? (
+                  <Clock className="mr-2 h-4 w-4" />
+                ) : (
+                  <Eye className="mr-2 h-4 w-4" />
+                )}
+                {isApproving ? "Processing..." : 
+                 treasuryHasReviewed ? "Treasury Reviewed" : 
+                 !accountingHasReviewedGso ? "Awaiting Accounting Review" : 
+                 "Treasury Review"}
+              </Button>
             )}
             {canEdit && (
               <Button variant="outline">
@@ -542,6 +946,11 @@ export default function DisbursementDetailPage() {
                         case "REJECT": return "rejected the disbursement"
                         case "UPDATE": return "updated the disbursement"
                         case "VALIDATE": return "validated the disbursement"
+                        case "REVIEW": return "reviewed the disbursement"
+                        case "BAC_REVIEW": return "reviewed the disbursement (BAC)"
+                        case "BUDGET_REVIEW": return "reviewed the disbursement (Budget Office)"
+                        case "ACCOUNTING_REVIEW": return "reviewed the disbursement (Accounting)"
+                        case "TREASURY_REVIEW": return "reviewed the disbursement (Treasury)"
                         default: return `${action.toLowerCase()}d the disbursement`
                       }
                     }
@@ -554,6 +963,11 @@ export default function DisbursementDetailPage() {
                         case "REJECT": return "bg-red-500"
                         case "UPDATE": return "bg-purple-500"
                         case "VALIDATE": return "bg-indigo-500"
+                        case "REVIEW": return "bg-cyan-500"
+                        case "BAC_REVIEW": return "bg-purple-600"
+                        case "BUDGET_REVIEW": return "bg-orange-600"
+                        case "ACCOUNTING_REVIEW": return "bg-green-600"
+                        case "TREASURY_REVIEW": return "bg-indigo-600"
                         default: return "bg-gray-500"
                       }
                     }

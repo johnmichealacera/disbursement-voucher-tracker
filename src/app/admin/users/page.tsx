@@ -85,7 +85,7 @@ const createUserSchema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("Invalid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
-  role: z.enum(["REQUESTER", "ACCOUNTING", "BUDGET", "TREASURY", "MAYOR", "ADMIN", "DEPARTMENT_HEAD", "FINANCE_HEAD"]),
+  role: z.enum(["REQUESTER", "ACCOUNTING", "BUDGET", "TREASURY", "MAYOR", "ADMIN", "DEPARTMENT_HEAD", "FINANCE_HEAD", "GSO", "HR", "BAC"]),
   department: z.string().optional()
 })
 
@@ -99,7 +99,10 @@ const roleLabels = {
   MAYOR: "Mayor",
   ADMIN: "Administrator",
   DEPARTMENT_HEAD: "Department Head",
-  FINANCE_HEAD: "Finance Head"
+  FINANCE_HEAD: "Finance Head",
+  GSO: "General Services Office",
+  HR: "Human Resources",
+  BAC: "Bids and Awards Committee"
 }
 
 const roleColors = {
@@ -110,7 +113,10 @@ const roleColors = {
   ACCOUNTING: "bg-yellow-100 text-yellow-800",
   BUDGET: "bg-orange-100 text-orange-800",
   TREASURY: "bg-indigo-100 text-indigo-800",
-  REQUESTER: "bg-gray-100 text-gray-800"
+  REQUESTER: "bg-gray-100 text-gray-800",
+  GSO: "bg-teal-100 text-teal-800",
+  HR: "bg-pink-100 text-pink-800",
+  BAC: "bg-violet-100 text-violet-800"
 }
 
 export default function AdminUsersPage() {

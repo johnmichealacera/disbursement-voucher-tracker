@@ -14,20 +14,24 @@ A comprehensive, transparent, and efficient disbursement tracking system designe
 ## 🚀 Features
 
 ### Core Functionality
-- **Multi-role Authentication**: Supports 8 different user roles with appropriate permissions
+- **Multi-role Authentication**: Supports 11 different user roles with appropriate permissions
 - **Disbursement Lifecycle Management**: From draft creation to fund release
 - **Multi-level Approval Workflow**: Department Head → Finance Head → Mayor
+- **GSO Specialized Workflow**: Mayor → BAC → Budget → Accounting → Treasury review chain
 - **Real-time Status Tracking**: Complete visibility of disbursement progress
-- **Comprehensive Audit Trail**: Full transparency with detailed activity logs
+- **Comprehensive Audit Trail**: Full transparency with detailed activity logs and timestamps
 
 ### User Roles
 - **Requester**: Create and manage disbursement requests
-- **Accounting**: Validate and process financial aspects
-- **Budget**: Review budget allocations and compliance
-- **Treasury**: Handle fund disbursement and payment processing
+- **GSO (General Services Office)**: Create and manage procurement-related disbursement requests
+- **HR (Human Resources)**: Create and manage HR-related disbursement requests
+- **Accounting**: Validate and process financial aspects, review GSO workflow vouchers
+- **Budget**: Review budget allocations and compliance, review GSO workflow vouchers
+- **Treasury**: Handle fund disbursement and payment processing, final review for GSO workflow
 - **Department Head**: First-level approval authority
 - **Finance Head**: Financial oversight and approval
-- **Mayor**: Final approval authority
+- **Mayor**: Review vouchers from GSO, HR, and regular offices
+- **BAC (Bids and Awards Committee)**: Review GSO vouchers after Mayor approval
 - **Admin**: System administration and user management
 
 ### Key Features
@@ -125,6 +129,9 @@ The seed script creates the following test accounts:
 |------|-------|----------|------------|
 | Admin | admin@municipality.gov | admin123 | IT Department |
 | Requester | requester@municipality.gov | requester123 | Public Works |
+| GSO | gso@municipality.gov | gso123 | General Services Office |
+| HR | hr@municipality.gov | hr123 | Human Resources |
+| BAC | bac@municipality.gov | bac123 | Bids and Awards Committee |
 | Accounting | accounting@municipality.gov | accounting123 | Finance Department |
 | Budget | budget@municipality.gov | budget123 | Finance Department |
 | Treasury | treasury@municipality.gov | treasury123 | Treasury Department |
@@ -295,6 +302,11 @@ The system features a comprehensive notification system that keeps users informe
 - `DELETE /api/disbursements/[id]` - Delete disbursement
 - `POST /api/disbursements/[id]/submit` - Submit draft for review
 - `POST /api/disbursements/[id]/approve` - Approve/reject disbursement
+- `POST /api/disbursements/[id]/review` - Mayor review for GSO/HR/Requester vouchers
+- `POST /api/disbursements/[id]/bac-review` - BAC review for GSO vouchers
+- `POST /api/disbursements/[id]/budget-review` - Budget Office review for GSO vouchers
+- `POST /api/disbursements/[id]/accounting-review` - Accounting review for GSO vouchers
+- `POST /api/disbursements/[id]/treasury-review` - Treasury review for GSO vouchers
 
 ### Users (Admin only)
 - `GET /api/users` - List users with filtering and pagination
@@ -325,37 +337,48 @@ For technical support or questions:
 - Contact your system administrator
 - Review the documentation
 
-## ✨ Recent Enhancements (v2.0)
+## ✨ Recent Enhancements (v3.0)
 
-### **🔔 Real-time Notification System**
-- Smart role-based notifications with priority levels
-- Visual notification bell with animated indicators
-- Auto-refresh every 30 seconds for real-time updates
-- Direct navigation from notifications to relevant vouchers
+### **🏢 New Organizational Roles**
+- **GSO (General Services Office)**: Specialized procurement workflow management
+- **HR (Human Resources)**: HR-specific disbursement request handling
+- **BAC (Bids and Awards Committee)**: Review GSO procurement requests
 
-### **⚡ Enhanced Approval Workflow**
-- Role-specific action buttons (Validate, Approve, Final Approve, Reject)
-- Sequential approval enforcement with smart logic
-- Admin can approve at any level with automatic level detection
-- Real-time status updates after approval actions
+### **🔄 GSO Specialized Workflow**
+- **Sequential Review Chain**: Mayor → BAC → Budget → Accounting → Treasury
+- **Smart Button States**: Visual indicators for workflow progression
+- **Role-based Notifications**: Each department gets notified when their review is needed
+- **Complete Audit Trail**: Full tracking of all review steps with timestamps
 
-### **📊 Improved Activity Tracking**
-- Full timestamps instead of just dates in activity logs
-- Color-coded activity indicators by action type
-- Enhanced action descriptions with user role context
-- Expanded activity history (10 items vs 5)
+### **🔔 Enhanced Notification System**
+- **Role-specific Alerts**: Tailored notifications for each workflow participant
+- **Priority-based Messaging**: High priority for urgent reviews, medium for status updates
+- **Smart Filtering**: Only shows actionable items for each role
+- **Real-time Updates**: Auto-refresh every 30 seconds with visual indicators
 
-### **👥 Complete User Management**
-- Full admin interface for user administration
-- Advanced filtering and search capabilities
-- User creation, editing, and status management
-- Safety checks preventing self-deletion and data integrity issues
+### **⚡ Advanced Approval Logic**
+- **Sequential Enforcement**: Each step must be completed before the next
+- **Visual State Management**: Buttons show "Awaiting Previous Review" when dependencies aren't met
+- **Multi-workflow Support**: Regular approval workflow + GSO specialized workflow
+- **Admin Flexibility**: Admins can act at appropriate levels in both workflows
 
-### **🎨 UI/UX Improvements**
-- Modern notification dropdown with rich information display
-- Enhanced disbursement detail page with approval buttons
-- Improved activity log with better visual hierarchy
-- Responsive design optimizations
+### **📊 Comprehensive Activity Tracking**
+- **Full Timestamp Logging**: Complete date and time for all actions
+- **Role-specific Descriptions**: Clear action descriptions with department context
+- **Color-coded Indicators**: Visual differentiation for different action types
+- **Extended History**: Detailed audit trail for compliance and transparency
+
+### **👥 Complete User Management System**
+- **11 User Roles**: Full support for all organizational roles
+- **Advanced Admin Interface**: User creation, editing, and management
+- **Role-based Permissions**: Granular access control for each role type
+- **Department Management**: Proper organizational structure support
+
+### **🎨 Enhanced User Experience**
+- **Smart Review Buttons**: Context-aware buttons with tooltips and state indicators
+- **Visual Workflow Progress**: Clear indication of where each voucher stands
+- **Responsive Design**: Optimized for all device types
+- **Intuitive Navigation**: Easy access to relevant functions for each role
 
 ## 🔮 Future Enhancements
 

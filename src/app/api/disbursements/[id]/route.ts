@@ -102,7 +102,7 @@ export async function GET(
     const canAccess = 
       disbursement.createdById === session.user.id ||
       disbursement.assignedToId === session.user.id ||
-      ["ADMIN", "ACCOUNTING", "BUDGET", "TREASURY", "MAYOR", "DEPARTMENT_HEAD", "FINANCE_HEAD"].includes(session.user.role)
+      ["ADMIN", "ACCOUNTING", "BUDGET", "TREASURY", "MAYOR", "DEPARTMENT_HEAD", "FINANCE_HEAD", "BAC"].includes(session.user.role)
 
     if (!canAccess) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 })

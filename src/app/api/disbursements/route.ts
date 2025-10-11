@@ -49,11 +49,52 @@ export async function GET(request: NextRequest) {
     }
 
     // Role-based filtering
-    if (session.user.role === "REQUESTER") {
+    if (["REQUESTER", "GSO", "HR"].includes(session.user.role)) {
       where.createdById = session.user.id
     } else if (session.user.role === "ACCOUNTING") {
-      where.status = {
-        in: ["PENDING", "VALIDATED", "APPROVED", "RELEASED"]
+      // Accounting can view all vouchers (existing functionality) + GSO vouchers for review workflow
+      where.OR = [
+        {
+          status: {
+            in: ["PENDING", "VALIDATED", "APPROVED", "RELEASED"]
+          }
+        },
+        {
+          createdBy: {
+            role: "GSO"
+          }
+        }
+      ]
+    } else if (session.user.role === "MAYOR") {
+      // Mayor can view all vouchers from GSO, HR, and regular offices
+      where.AND = [
+        {
+          createdBy: {
+            role: {
+              in: ["GSO", "HR", "REQUESTER"]
+            }
+          }
+        },
+        {
+          status: {
+            in: ["PENDING", "VALIDATED", "APPROVED", "RELEASED", "REJECTED"]
+          }
+        }
+      ]
+    } else if (session.user.role === "BAC") {
+      // BAC can view all GSO vouchers (review button will be controlled in UI)
+      where.createdBy = {
+        role: "GSO"
+      }
+    } else if (session.user.role === "BUDGET") {
+      // Budget Office can view all GSO vouchers (review button will be controlled in UI)
+      where.createdBy = {
+        role: "GSO"
+      }
+    } else if (session.user.role === "TREASURY") {
+      // Treasury can view all GSO vouchers (review button will be controlled in UI)
+      where.createdBy = {
+        role: "GSO"
       }
     }
 

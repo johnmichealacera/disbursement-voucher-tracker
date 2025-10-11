@@ -63,6 +63,27 @@ async function main() {
       password: await bcrypt.hash('finhead123', 12),
       role: 'FINANCE_HEAD' as UserRole,
       department: 'Finance Department'
+    },
+    {
+      name: 'GSO Officer',
+      email: 'gso@municipality.gov',
+      password: await bcrypt.hash('gso123', 12),
+      role: 'GSO' as UserRole,
+      department: 'General Services Office'
+    },
+    {
+      name: 'HR Officer',
+      email: 'hr@municipality.gov',
+      password: await bcrypt.hash('hr123', 12),
+      role: 'HR' as UserRole,
+      department: 'Human Resources'
+    },
+    {
+      name: 'BAC Member',
+      email: 'bac@municipality.gov',
+      password: await bcrypt.hash('bac123', 12),
+      role: 'BAC' as UserRole,
+      department: 'Bids and Awards Committee'
     }
   ]
 
@@ -209,6 +230,9 @@ async function main() {
   console.log('Mayor: mayor@municipality.gov / mayor123')
   console.log('Dept Head: depthead@municipality.gov / depthead123')
   console.log('Finance Head: finhead@municipality.gov / finhead123')
+  console.log('GSO: gso@municipality.gov / gso123')
+  console.log('HR: hr@municipality.gov / hr123')
+  console.log('BAC: bac@municipality.gov / bac123')
 }
 
 main()

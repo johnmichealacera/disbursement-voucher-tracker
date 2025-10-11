@@ -75,6 +75,12 @@ export function getRoleDisplayName(role: string): string {
       return 'Department Head'
     case 'FINANCE_HEAD':
       return 'Finance Head'
+    case 'GSO':
+      return 'General Services Office'
+    case 'HR':
+      return 'Human Resources'
+    case 'BAC':
+      return 'Bids and Awards Committee'
     default:
       return role
   }

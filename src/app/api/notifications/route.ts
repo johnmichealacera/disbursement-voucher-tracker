@@ -5,12 +5,16 @@ import { prisma } from "@/lib/prisma"
 
 interface Notification {
   id: string
-  type: string
+  type?: string
   title: string
   message: string
+  status?: string
+  timestamp?: Date
+  actionType?: string
+  read?: boolean
   disbursementId: string
-  disbursementTitle: string
-  createdAt: string
+  disbursementTitle?: string
+  createdAt?: string
   priority: "high" | "medium" | "low"
 }
 
@@ -102,84 +106,324 @@ export async function GET(request: NextRequest) {
         break
 
       case "MAYOR":
-        // Level 3 approvals needed (after levels 1 & 2 are approved)
-        const pendingForMayor = await prisma.disbursementVoucher.findMany({
+        // Get vouchers from GSO, HR, and regular offices for review
+        const mayorReviewVouchers = await prisma.disbursementVoucher.findMany({
           where: {
-            status: "APPROVED",
-            approvals: {
-              some: {
-                level: 1,
-                status: "APPROVED"
+            createdBy: {
+              role: {
+                in: ["GSO", "HR", "REQUESTER"]
+              }
+            },
+            status: {
+              in: ["PENDING", "VALIDATED", "APPROVED"]
+            },
+            // Exclude vouchers already reviewed by this Mayor
+            NOT: {
+              auditTrails: {
+                some: {
+                  action: "REVIEW",
+                  userId: session.user.id
+                }
               }
             }
           },
           include: {
-            createdBy: {
-              select: { name: true, department: true }
-            },
-            approvals: {
-              where: { level: 2, status: "APPROVED" }
-            }
+            createdBy: { select: { name: true, role: true, department: true } }
           },
-          orderBy: { createdAt: "desc" },
+          orderBy: { updatedAt: "desc" },
           take: 10
         })
 
-        // Filter to only include those with level 2 approved
-        const mayorApprovals = pendingForMayor.filter(voucher => 
-          voucher.approvals.length > 0
+        mayorReviewVouchers.forEach(dv => {
+          let message = `Voucher "${dv.title}" from ${dv.createdBy.department || dv.createdBy.role} is available for review.`
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          let priority: any = "medium"
+          const actionType = "Review Required"
+
+          if (dv.status === "PENDING") {
+            message = `New voucher "${dv.title}" from ${dv.createdBy.department || dv.createdBy.role} submitted for review.`
+            priority = "high"
+          } else if (dv.status === "APPROVED") {
+            message = `Voucher "${dv.title}" from ${dv.createdBy.department || dv.createdBy.role} has been approved and ready for final review.`
+            priority = "high"
+          }
+
+          notifications.push({
+            id: `mayor-${dv.id}-${dv.updatedAt.getTime()}`,
+            disbursementId: dv.id,
+            title: dv.title,
+            message: message,
+            status: dv.status,
+            timestamp: dv.updatedAt,
+            priority: priority,
+            actionType: actionType,
+            read: false
+          })
+        })
+        break
+
+      case "BAC":
+        // Get all GSO vouchers and filter in application logic
+        const allGsoVouchers = await prisma.disbursementVoucher.findMany({
+          where: {
+            createdBy: {
+              role: "GSO"
+            },
+            status: {
+              in: ["PENDING", "VALIDATED", "APPROVED"]
+            },
+            // Exclude vouchers already reviewed by this BAC member
+            NOT: {
+              auditTrails: {
+                some: {
+                  action: "BAC_REVIEW",
+                  userId: session.user.id
+                }
+              }
+            }
+          },
+          include: {
+            createdBy: { select: { name: true, role: true, department: true } },
+            auditTrails: {
+              include: { user: { select: { role: true } } },
+              where: { action: "REVIEW" }
+            }
+          },
+          orderBy: { updatedAt: "desc" },
+          take: 10
+        })
+
+        // Filter to only include vouchers reviewed by Mayor
+        const bacReviewVouchers = allGsoVouchers.filter(voucher => 
+          voucher.auditTrails.some(trail => 
+            trail.action === "REVIEW" && trail.user.role === "MAYOR"
+          )
         )
 
-        mayorApprovals.forEach(voucher => {
+        bacReviewVouchers.forEach(dv => {
+          const message = `GSO voucher "${dv.title}" has been reviewed by Mayor and is ready for BAC review.`
+          const priority = "high"
+          const actionType = "BAC Review Required"
+
           notifications.push({
-            id: `mayor-${voucher.id}`,
-            type: "final_approval_needed",
-            title: "Final Approval Required",
-            message: `${voucher.title} from ${voucher.createdBy.name} needs final approval`,
-            disbursementId: voucher.id,
-            disbursementTitle: voucher.title,
-            createdAt: voucher.createdAt.toISOString(),
-            priority: "high"
+            id: `bac-${dv.id}-${dv.updatedAt.getTime()}`,
+            disbursementId: dv.id,
+            title: dv.title,
+            message: message,
+            status: dv.status,
+            timestamp: dv.updatedAt,
+            priority: priority,
+            actionType: actionType,
+            read: false
+          })
+        })
+        break
+
+      case "BUDGET":
+        // Get all GSO vouchers and filter in application logic
+        const allGsoBudgetVouchers = await prisma.disbursementVoucher.findMany({
+          where: {
+            createdBy: {
+              role: "GSO"
+            },
+            status: {
+              in: ["PENDING", "VALIDATED", "APPROVED"]
+            },
+            // Exclude vouchers already reviewed by this Budget member
+            NOT: {
+              auditTrails: {
+                some: {
+                  action: "BUDGET_REVIEW",
+                  userId: session.user.id
+                }
+              }
+            }
+          },
+          include: {
+            createdBy: { select: { name: true, role: true, department: true } },
+            auditTrails: {
+              include: { user: { select: { role: true } } },
+              where: { action: { in: ["BAC_REVIEW"] } }
+            }
+          },
+          orderBy: { updatedAt: "desc" },
+          take: 10
+        })
+
+        // Filter to only include vouchers reviewed by BAC
+        const budgetReviewVouchers = allGsoBudgetVouchers.filter(voucher => 
+          voucher.auditTrails.some(trail => 
+            trail.action === "BAC_REVIEW" && trail.user.role === "BAC"
+          )
+        )
+
+        budgetReviewVouchers.forEach(dv => {
+          const message = `GSO voucher "${dv.title}" has been reviewed by BAC and is ready for Budget Office review.`
+          const priority = "high"
+          const actionType = "Budget Review Required"
+
+          notifications.push({
+            id: `budget-${dv.id}-${dv.updatedAt.getTime()}`,
+            disbursementId: dv.id,
+            title: dv.title,
+            message: message,
+            status: dv.status,
+            timestamp: dv.updatedAt,
+            priority: priority,
+            actionType: actionType,
+            read: false
           })
         })
         break
 
       case "TREASURY":
-        // Approved vouchers ready for release
-        const readyForRelease = await prisma.disbursementVoucher.findMany({
+        // Get all GSO vouchers and filter in application logic
+        const allGsoTreasuryVouchers = await prisma.disbursementVoucher.findMany({
           where: {
-            status: "APPROVED",
-            approvals: {
-              some: {
-                level: 3,
-                status: "APPROVED"
+            createdBy: {
+              role: "GSO"
+            },
+            status: {
+              in: ["PENDING", "VALIDATED", "APPROVED"]
+            },
+            // Exclude vouchers already reviewed by this Treasury member
+            NOT: {
+              auditTrails: {
+                some: {
+                  action: "TREASURY_REVIEW",
+                  userId: session.user.id
+                }
               }
             }
           },
           include: {
-            createdBy: {
-              select: { name: true, department: true }
+            createdBy: { select: { name: true, role: true, department: true } },
+            auditTrails: {
+              include: { user: { select: { role: true } } },
+              where: { action: { in: ["ACCOUNTING_REVIEW"] } }
             }
           },
-          orderBy: { createdAt: "desc" },
+          orderBy: { updatedAt: "desc" },
           take: 10
         })
 
-        readyForRelease.forEach(voucher => {
+        // Filter to only include vouchers reviewed by Accounting
+        const treasuryReviewVouchers = allGsoTreasuryVouchers.filter(voucher => 
+          voucher.auditTrails.some(trail => 
+            trail.action === "ACCOUNTING_REVIEW" && trail.user.role === "ACCOUNTING"
+          )
+        )
+
+        treasuryReviewVouchers.forEach(dv => {
+          const message = `GSO voucher "${dv.title}" has been reviewed by Accounting and is ready for Treasury review.`
+          const priority = "high"
+          const actionType = "Treasury Review Required"
+
           notifications.push({
-            id: `treasury-${voucher.id}`,
-            type: "ready_for_release",
-            title: "Ready for Release",
-            message: `${voucher.title} is approved and ready for disbursement`,
-            disbursementId: voucher.id,
-            disbursementTitle: voucher.title,
-            createdAt: voucher.createdAt.toISOString(),
-            priority: "medium"
+            id: `treasury-${dv.id}-${dv.updatedAt.getTime()}`,
+            disbursementId: dv.id,
+            title: dv.title,
+            message: message,
+            status: dv.status,
+            timestamp: dv.updatedAt,
+            priority: priority,
+            actionType: actionType,
+            read: false
+          })
+        })
+
+        // Also include existing approved vouchers ready for release (original functionality)
+        const readyForRelease = await prisma.disbursementVoucher.findMany({
+          where: {
+            status: "APPROVED",
+            NOT: {
+              createdBy: {
+                role: "GSO" // Exclude GSO vouchers as they have their own workflow
+              }
+            }
+          },
+          include: {
+            createdBy: { select: { name: true, department: true } }
+          },
+          orderBy: { updatedAt: "desc" },
+          take: 5
+        })
+
+        readyForRelease.forEach(dv => {
+          notifications.push({
+            id: `treasury-release-${dv.id}-${dv.updatedAt.getTime()}`,
+            disbursementId: dv.id,
+            title: dv.title,
+            message: `Voucher "${dv.title}" is approved and ready for release.`,
+            status: dv.status,
+            timestamp: dv.updatedAt,
+            priority: "medium",
+            actionType: "Ready for Release",
+            read: false
+          })
+        })
+        break
+
+      case "ACCOUNTING":
+        // Get all GSO vouchers and filter in application logic
+        const allGsoAccountingVouchers = await prisma.disbursementVoucher.findMany({
+          where: {
+            createdBy: {
+              role: "GSO"
+            },
+            status: {
+              in: ["PENDING", "VALIDATED", "APPROVED"]
+            },
+            // Exclude vouchers already reviewed by this Accounting member
+            NOT: {
+              auditTrails: {
+                some: {
+                  action: "ACCOUNTING_REVIEW",
+                  userId: session.user.id
+                }
+              }
+            }
+          },
+          include: {
+            createdBy: { select: { name: true, role: true, department: true } },
+            auditTrails: {
+              include: { user: { select: { role: true } } },
+              where: { action: { in: ["BUDGET_REVIEW"] } }
+            }
+          },
+          orderBy: { updatedAt: "desc" },
+          take: 10
+        })
+
+        // Filter to only include vouchers reviewed by Budget Office
+        const accountingReviewVouchers = allGsoAccountingVouchers.filter(voucher => 
+          voucher.auditTrails.some(trail => 
+            trail.action === "BUDGET_REVIEW" && trail.user.role === "BUDGET"
+          )
+        )
+
+        accountingReviewVouchers.forEach(dv => {
+          const message = `GSO voucher "${dv.title}" has been reviewed by Budget Office and is ready for Accounting review.`
+          const priority = "high"
+          const actionType = "Accounting Review Required"
+
+          notifications.push({
+            id: `accounting-${dv.id}-${dv.updatedAt.getTime()}`,
+            disbursementId: dv.id,
+            title: dv.title,
+            message: message,
+            status: dv.status,
+            timestamp: dv.updatedAt,
+            priority: priority,
+            actionType: actionType,
+            read: false
           })
         })
         break
 
       case "REQUESTER":
+      case "GSO":
+      case "HR":
         // Get user's own vouchers with status updates
         const userVouchers = await prisma.disbursementVoucher.findMany({
           where: {
@@ -292,7 +536,8 @@ export async function GET(request: NextRequest) {
       if (priorityOrder[a.priority] !== priorityOrder[b.priority]) {
         return priorityOrder[b.priority] - priorityOrder[a.priority]
       }
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return new Date(b.createdAt as any).getTime() - new Date(a.createdAt as any).getTime()
     })
 
     return NextResponse.json({

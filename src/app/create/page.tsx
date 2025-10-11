@@ -144,7 +144,7 @@ export default function CreateVoucherPage() {
     return null
   }
 
-  if (session.user.role !== "REQUESTER" && session.user.role !== "ADMIN") {
+  if (!["REQUESTER", "ADMIN", "GSO", "HR"].includes(session.user.role)) {
     return (
       <MainLayout>
         <div className="p-6">

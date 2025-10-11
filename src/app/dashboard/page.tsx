@@ -294,7 +294,7 @@ export default function DashboardPage() {
         </Card>
 
         {/* Quick Actions */}
-        {session.user.role === "REQUESTER" && (
+        {["REQUESTER", "GSO", "HR"].includes(session.user.role) && (
           <Card>
             <CardHeader>
               <CardTitle>Quick Actions</CardTitle>

@@ -19,6 +19,9 @@ enum UserRole {
   ADMIN
   DEPARTMENT_HEAD
   FINANCE_HEAD
+  GSO
+  HR
+  BAC
 }
 
 enum VoucherStatus {
