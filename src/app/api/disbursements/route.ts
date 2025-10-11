@@ -10,6 +10,7 @@ const createDisbursementSchema = z.object({
   amount: z.number().positive("Amount must be positive"),
   purpose: z.string().min(1, "Purpose is required"),
   project: z.string().optional(),
+  status: z.enum(["DRAFT", "PENDING"]).optional().default("DRAFT"),
   items: z.array(z.object({
     description: z.string().min(1, "Description is required"),
     quantity: z.number().positive("Quantity must be positive"),
@@ -133,7 +134,7 @@ export async function POST(request: NextRequest) {
         purpose: validatedData.purpose,
         project: validatedData.project,
         createdById: session.user.id,
-        status: "DRAFT",
+        status: validatedData.status || "DRAFT",
         items: {
           create: validatedData.items
         }
@@ -154,7 +155,7 @@ export async function POST(request: NextRequest) {
     // Create audit trail
     await prisma.auditTrail.create({
       data: {
-        action: "CREATE",
+        action: validatedData.status === "PENDING" ? "SUBMIT" : "CREATE",
         entityType: "DisbursementVoucher",
         entityId: disbursement.id,
         newValues: disbursement,

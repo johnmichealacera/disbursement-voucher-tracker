@@ -27,6 +27,7 @@ import {
   User,
   Settings
 } from "lucide-react"
+import { NotificationBell } from "@/components/notifications/notification-bell"
 
 interface MainLayoutProps {
   children: React.ReactNode
@@ -189,6 +190,7 @@ export function MainLayout({ children }: MainLayoutProps) {
             </Button>
 
             <div className="flex items-center space-x-4 ml-auto">
+              <NotificationBell />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-8 w-8 rounded-full">

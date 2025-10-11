@@ -9,7 +9,6 @@ import { z } from "zod"
 import { MainLayout } from "@/components/layout/main-layout"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -22,7 +21,7 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { formatCurrency } from "@/lib/utils"
-import { Plus, Trash2, Save, Send, Calculator } from "lucide-react"
+import { Plus, Trash2, Save, Send } from "lucide-react"
 
 const createVoucherSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -96,7 +95,8 @@ export default function CreateVoucherPage() {
     setError("")
 
     try {
-      const response = await fetch("/api/disbursements", {
+      // First, create the disbursement as DRAFT
+      const createResponse = await fetch("/api/disbursements", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -104,19 +104,37 @@ export default function CreateVoucherPage() {
         body: JSON.stringify({
           ...data,
           amount: totalAmount,
-          status: isDraft ? "DRAFT" : "PENDING"
+          status: "DRAFT"
         }),
       })
 
-      if (response.ok) {
-        const result = await response.json()
-        router.push(`/disbursements/${result.id}`)
-      } else {
-        const errorData = await response.json()
+      if (!createResponse.ok) {
+        const errorData = await createResponse.json()
         setError(errorData.error || "Failed to create voucher")
+        return
       }
-    } catch (error) {
-      setError("An error occurred while creating the voucher")
+
+      const result = await createResponse.json()
+
+      // If not saving as draft, submit for review
+      if (!isDraft) {
+        const submitResponse = await fetch(`/api/disbursements/${result.id}/submit`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        })
+
+        if (!submitResponse.ok) {
+          const errorData = await submitResponse.json()
+          setError(errorData.error || "Failed to submit voucher for review")
+          return
+        }
+      }
+
+      router.push(`/disbursements/${result.id}`)
+    } catch {
+      setError("An error occurred while processing the voucher")
     } finally {
       setIsSubmitting(false)
     }

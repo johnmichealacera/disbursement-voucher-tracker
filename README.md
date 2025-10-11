@@ -32,13 +32,15 @@ A comprehensive, transparent, and efficient disbursement tracking system designe
 
 ### Key Features
 - **Dashboard**: Role-based overview with key metrics and recent activities
-- **Voucher Management**: Create, edit, and track disbursement vouchers
+- **Voucher Management**: Create, edit, and track disbursement vouchers with full timestamps
 - **Item-based Requests**: Detailed line items with automatic calculations
 - **Document Attachments**: Support for supporting documents
-- **Approval Workflow**: Structured multi-level approval process
+- **Approval Workflow**: Structured multi-level approval process with role-based buttons
 - **Status Management**: Clear status progression (Draft → Pending → Validated → Approved → Released)
-- **Audit Trail**: Complete history of all actions and changes
-- **Responsive Design**: Mobile-friendly interface
+- **Real-time Notifications**: Smart notification system with role-based alerts
+- **Enhanced Audit Trail**: Complete history with detailed timestamps and action descriptions
+- **User Management**: Complete admin interface for user administration
+- **Responsive Design**: Mobile-friendly interface with modern UI components
 
 ## 🛠️ Tech Stack
 
@@ -163,27 +165,31 @@ prisma/
 ### 1. Initiation (Requester)
 - Create disbursement voucher with detailed items
 - Add supporting documents
-- Submit for validation
+- Submit for validation (triggers notifications)
 
 ### 2. Validation (Accounting/Finance)
+- Receive real-time notification of pending vouchers
 - Review completeness and budget allocation
-- Return to requester if incomplete
-- Forward to approval when valid
+- Use "Validate" button for approval or "Reject" with remarks
+- System automatically updates status and notifies next level
 
-### 3. Approval Workflow
-- **Level 1**: Department Head approval
-- **Level 2**: Finance Head approval  
-- **Level 3**: Mayor approval (final authority)
+### 3. Multi-Level Approval Workflow
+- **Level 1**: Department Head receives notification → "Validate" button → Status: VALIDATED
+- **Level 2**: Finance Head receives notification → "Approve" button → Status: APPROVED  
+- **Level 3**: Mayor receives notification → "Final Approve" button → Status: RELEASED
+- **Sequential enforcement**: Each level must be completed before the next
 
 ### 4. Disbursement Processing (Treasury)
+- Receive notification when voucher is fully approved
 - Prepare disbursement voucher
 - Validate compliance
-- Mark as "For Release"
+- Process payment and mark as "Released"
 
-### 5. Fund Release
-- Record payment method (cash/check/transfer)
-- Update status to "Released"
-- Upload signed receipts
+### 5. Status Notifications
+- **Requesters**: Get notified of status changes (validated, approved, released, rejected)
+- **Approvers**: Get notified of pending items requiring their action
+- **Treasury**: Get notified of approved vouchers ready for disbursement
+- **Admin**: Get overview of all pending items across all levels
 
 ## 🔐 Security Features
 
@@ -250,6 +256,31 @@ npm run db:reset     # Reset database (development only)
 4. Add proper authentication checks
 5. Update audit trail logging
 
+## 🔔 Notification System
+
+### Real-time Notifications
+The system features a comprehensive notification system that keeps users informed of relevant disbursement activities:
+
+#### **Notification Bell**
+- Located in the top-right corner next to the user account
+- Shows red badge with count for urgent notifications
+- Animated bell and bouncing badge for attention
+- Auto-refreshes every 30 seconds
+
+#### **Role-based Notifications**
+- **Department Head**: Pending vouchers needing Level 1 validation
+- **Finance Head/Accounting**: Validated vouchers needing Level 2 approval
+- **Mayor**: Approved vouchers needing final authorization
+- **Treasury**: Fully approved vouchers ready for disbursement
+- **Requester**: Status updates on their submitted vouchers
+- **Admin**: Overview of all pending items across all levels
+
+#### **Smart Features**
+- **Priority System**: High (urgent), Medium (normal), Low (informational)
+- **Direct Navigation**: Click notification to go directly to voucher
+- **Rich Information**: Shows timestamps, user roles, and action context
+- **Sequential Awareness**: Only shows actionable items for each role
+
 ## 📝 API Documentation
 
 ### Authentication
@@ -262,11 +293,18 @@ npm run db:reset     # Reset database (development only)
 - `GET /api/disbursements/[id]` - Get disbursement details
 - `PATCH /api/disbursements/[id]` - Update disbursement
 - `DELETE /api/disbursements/[id]` - Delete disbursement
+- `POST /api/disbursements/[id]/submit` - Submit draft for review
 - `POST /api/disbursements/[id]/approve` - Approve/reject disbursement
 
 ### Users (Admin only)
-- `GET /api/users` - List users
+- `GET /api/users` - List users with filtering and pagination
 - `POST /api/users` - Create new user
+- `GET /api/users/[id]` - Get user details
+- `PATCH /api/users/[id]` - Update user information
+- `DELETE /api/users/[id]` - Delete user (with safety checks)
+
+### Notifications
+- `GET /api/notifications` - Get role-based notifications for current user
 
 ## 🤝 Contributing
 
@@ -286,6 +324,38 @@ For technical support or questions:
 - Create an issue in the repository
 - Contact your system administrator
 - Review the documentation
+
+## ✨ Recent Enhancements (v2.0)
+
+### **🔔 Real-time Notification System**
+- Smart role-based notifications with priority levels
+- Visual notification bell with animated indicators
+- Auto-refresh every 30 seconds for real-time updates
+- Direct navigation from notifications to relevant vouchers
+
+### **⚡ Enhanced Approval Workflow**
+- Role-specific action buttons (Validate, Approve, Final Approve, Reject)
+- Sequential approval enforcement with smart logic
+- Admin can approve at any level with automatic level detection
+- Real-time status updates after approval actions
+
+### **📊 Improved Activity Tracking**
+- Full timestamps instead of just dates in activity logs
+- Color-coded activity indicators by action type
+- Enhanced action descriptions with user role context
+- Expanded activity history (10 items vs 5)
+
+### **👥 Complete User Management**
+- Full admin interface for user administration
+- Advanced filtering and search capabilities
+- User creation, editing, and status management
+- Safety checks preventing self-deletion and data integrity issues
+
+### **🎨 UI/UX Improvements**
+- Modern notification dropdown with rich information display
+- Enhanced disbursement detail page with approval buttons
+- Improved activity log with better visual hierarchy
+- Responsive design optimizations
 
 ## 🔮 Future Enhancements
 
