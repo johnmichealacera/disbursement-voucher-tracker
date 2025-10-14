@@ -9,6 +9,15 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Textarea } from "@/components/ui/textarea"
+import {
   Table,
   TableBody,
   TableCell,
@@ -37,6 +46,7 @@ interface DisbursementItem {
   id: string
   description: string
   quantity: number
+  unit: string
   unitPrice: number
   totalPrice: number
 }
@@ -72,10 +82,12 @@ interface AuditTrail {
 
 interface Disbursement {
   id: string
-  title: string
+  payee: string
+  address: string
   amount: number
-  purpose: string
-  project?: string
+  particulars: string
+  tags: string[]
+  sourceOffice: string[]
   status: string
   remarks?: string
   createdAt: string
@@ -98,6 +110,9 @@ export default function DisbursementDetailPage() {
   const [error, setError] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isApproving, setIsApproving] = useState(false)
+  const [showReviewDialog, setShowReviewDialog] = useState(false)
+  const [reviewRemarks, setReviewRemarks] = useState("")
+  const [reviewType, setReviewType] = useState<"REVIEW" | "BUDGET_REVIEW" | "TREASURY_REVIEW" | "ACCOUNTING_REVIEW" | "BAC_REVIEW">("REVIEW")
 
   const fetchDisbursement = async () => {
     try {
@@ -584,7 +599,7 @@ export default function DisbursementDetailPage() {
               Back
             </Button>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">{disbursement.title}</h1>
+              <h1 className="text-2xl font-bold text-gray-900">{disbursement.payee}</h1>
               <p className="text-gray-600">Disbursement Voucher #{disbursement.id.slice(-8)}</p>
             </div>
           </div>
@@ -771,24 +786,46 @@ export default function DisbursementDetailPage() {
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm font-medium text-gray-600">Title</label>
-                    <p className="text-sm text-gray-900">{disbursement.title}</p>
+                    <label className="text-sm font-medium text-gray-600">Payee</label>
+                    <p className="text-sm text-gray-900">{disbursement.payee}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-600">Total Amount</label>
-                    <p className="text-lg font-bold text-gray-900">
-                      {formatCurrency(disbursement.amount)}
-                    </p>
+                    <label className="text-sm font-medium text-gray-600">Address</label>
+                    <p className="text-sm text-gray-900">{disbursement.address}</p>
                   </div>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-600">Purpose</label>
-                  <p className="text-sm text-gray-900">{disbursement.purpose}</p>
+                  <label className="text-sm font-medium text-gray-600">Total Amount</label>
+                  <p className="text-lg font-bold text-gray-900">
+                    {formatCurrency(disbursement.amount)}
+                  </p>
                 </div>
-                {disbursement.project && (
+                <div>
+                  <label className="text-sm font-medium text-gray-600">Particulars</label>
+                  <p className="text-sm text-gray-900">{disbursement.particulars}</p>
+                </div>
+                {disbursement.tags.length > 0 && (
                   <div>
-                    <label className="text-sm font-medium text-gray-600">Project</label>
-                    <p className="text-sm text-gray-900">{disbursement.project}</p>
+                    <label className="text-sm font-medium text-gray-600">Tags</label>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {disbursement.tags.map((tag, index) => (
+                        <span key={index} className="bg-blue-100 text-blue-800 px-2 py-1 rounded-md text-sm">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {disbursement.sourceOffice.length > 0 && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Source Office</label>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {disbursement.sourceOffice.map((office, index) => (
+                        <span key={index} className="bg-green-100 text-green-800 px-2 py-1 rounded-md text-sm">
+                          {office}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 )}
                 {disbursement.remarks && (
@@ -814,6 +851,7 @@ export default function DisbursementDetailPage() {
                     <TableRow>
                       <TableHead>Description</TableHead>
                       <TableHead className="text-right">Qty</TableHead>
+                      <TableHead className="text-center">Unit</TableHead>
                       <TableHead className="text-right">Unit Price</TableHead>
                       <TableHead className="text-right">Total</TableHead>
                     </TableRow>
@@ -823,6 +861,7 @@ export default function DisbursementDetailPage() {
                       <TableRow key={item.id}>
                         <TableCell>{item.description}</TableCell>
                         <TableCell className="text-right">{item.quantity}</TableCell>
+                        <TableCell className="text-center">{item.unit}</TableCell>
                         <TableCell className="text-right">
                           {formatCurrency(item.unitPrice)}
                         </TableCell>
@@ -832,7 +871,7 @@ export default function DisbursementDetailPage() {
                       </TableRow>
                     ))}
                     <TableRow className="border-t-2">
-                      <TableCell colSpan={3} className="text-right font-medium">
+                      <TableCell colSpan={4} className="text-right font-medium">
                         Grand Total:
                       </TableCell>
                       <TableCell className="text-right font-bold text-lg">

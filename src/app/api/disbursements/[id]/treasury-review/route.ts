@@ -6,7 +6,7 @@ import { z } from "zod"
 
 const treasuryReviewSchema = z.object({
   action: z.enum(["TREASURY_REVIEWED"]),
-  comments: z.string().optional()
+  remarks: z.string().optional()
 })
 
 export async function POST(

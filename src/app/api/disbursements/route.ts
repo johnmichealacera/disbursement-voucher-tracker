@@ -4,16 +4,21 @@ import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { z } from "zod"
 import { VoucherStatus } from "@prisma/client"
+import { notifySourceOffices } from "@/lib/notifications"
 
 const createDisbursementSchema = z.object({
-  title: z.string().min(1, "Title is required"),
+  payee: z.string().min(1, "Payee is required"),
+  address: z.string().min(1, "Address is required"),
   amount: z.number().positive("Amount must be positive"),
-  purpose: z.string().min(1, "Purpose is required"),
-  project: z.string().optional(),
+  particulars: z.string().min(1, "Particulars is required"),
+  tags: z.array(z.string()).default([]),
+  sourceOffice: z.array(z.string()).default([]),
+  remarks: z.string().optional(),
   status: z.enum(["DRAFT", "PENDING"]).optional().default("DRAFT"),
   items: z.array(z.object({
     description: z.string().min(1, "Description is required"),
     quantity: z.number().positive("Quantity must be positive"),
+    unit: z.string().min(1, "Unit is required"),
     unitPrice: z.number().positive("Unit price must be positive"),
     totalPrice: z.number().positive("Total price must be positive")
   }))
@@ -170,10 +175,13 @@ export async function POST(request: NextRequest) {
 
     const disbursement = await prisma.disbursementVoucher.create({
       data: {
-        title: validatedData.title,
+        payee: validatedData.payee,
+        address: validatedData.address,
         amount: validatedData.amount,
-        purpose: validatedData.purpose,
-        project: validatedData.project,
+        particulars: validatedData.particulars,
+        tags: validatedData.tags,
+        sourceOffice: validatedData.sourceOffice,
+        remarks: validatedData.remarks,
         createdById: session.user.id,
         status: validatedData.status || "DRAFT",
         items: {
@@ -204,6 +212,16 @@ export async function POST(request: NextRequest) {
         disbursementVoucherId: disbursement.id
       }
     })
+
+    // Send notifications to source offices if any are specified
+    if (validatedData.sourceOffice && validatedData.sourceOffice.length > 0) {
+      await notifySourceOffices(validatedData.sourceOffice, {
+        id: disbursement.id,
+        payee: disbursement.payee,
+        amount: Number(disbursement.amount),
+        createdBy: disbursement.createdBy
+      })
+    }
 
     return NextResponse.json(disbursement, { status: 201 })
   } catch (error) {

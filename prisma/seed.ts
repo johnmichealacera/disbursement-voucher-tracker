@@ -109,84 +109,99 @@ async function main() {
     // Create sample disbursement vouchers
     const sampleVouchers = [
       {
-        title: 'Office Supplies Purchase',
+        payee: 'ABC Office Supplies Inc.',
+        address: '123 Business District, Quezon City',
         amount: 15000.00,
-        purpose: 'Purchase of office supplies including paper, pens, and folders for Q1 operations',
-        project: 'Office Operations Q1 2024',
+        particulars: 'Office Operations Q1 2024 - Essential supplies for daily operations',
+        tags: ['office-supplies', 'stationery', 'Q1-2024'],
+        sourceOffice: ['General Services Office', 'Administrative Office'],
         status: VoucherStatus.DRAFT,
         createdById: requester.id,
         items: [
           {
             description: 'A4 Paper (500 sheets)',
             quantity: 20,
+            unit: 'ream',
             unitPrice: 250.00,
             totalPrice: 5000.00
           },
           {
             description: 'Ballpoint Pens (Box of 12)',
             quantity: 10,
+            unit: 'box',
             unitPrice: 300.00,
             totalPrice: 3000.00
           },
           {
             description: 'Manila Folders',
             quantity: 100,
+            unit: 'piece',
             unitPrice: 70.00,
             totalPrice: 7000.00
           }
         ]
       },
       {
-        title: 'Road Maintenance Equipment',
+        payee: 'XYZ Construction Supply Co.',
+        address: '456 Industrial Avenue, Makati City',
         amount: 250000.00,
-        purpose: 'Purchase of equipment for road maintenance and repair activities',
-        project: 'Infrastructure Maintenance 2024',
+        particulars: 'Infrastructure Maintenance 2024 - Road repair materials and equipment',
+        tags: ['infrastructure', 'road-maintenance', 'construction'],
+        sourceOffice: ['Engineering Office', 'Public Works Department'],
         status: VoucherStatus.PENDING,
         createdById: requester.id,
         items: [
           {
             description: 'Asphalt Mix (per ton)',
             quantity: 50,
+            unit: 'ton',
             unitPrice: 3500.00,
             totalPrice: 175000.00
           },
           {
             description: 'Road Marking Paint (per gallon)',
             quantity: 25,
+            unit: 'gallon',
             unitPrice: 1200.00,
             totalPrice: 30000.00
           },
           {
             description: 'Traffic Cones',
             quantity: 50,
+            unit: 'piece',
             unitPrice: 900.00,
             totalPrice: 45000.00
           }
         ]
       },
       {
-        title: 'Community Event Supplies',
+        payee: 'Festival Events & Supplies',
+        address: '789 Event Plaza, Pasig City',
         amount: 75000.00,
-        purpose: 'Supplies and materials for the annual community festival',
-        project: 'Community Festival 2024',
+        particulars: 'Community Festival 2024 - Event equipment and decorative materials',
+        tags: ['community-event', 'festival', 'entertainment'],
+        sourceOffice: ['Community Affairs Office', 'Cultural Office'],
         status: VoucherStatus.VALIDATED,
         createdById: requester.id,
         items: [
           {
             description: 'Event Tents (10x10)',
             quantity: 10,
+            unit: 'piece',
             unitPrice: 5000.00,
             totalPrice: 50000.00
           },
           {
             description: 'Sound System Rental',
             quantity: 1,
+            unit: 'set',
             unitPrice: 15000.00,
             totalPrice: 15000.00
           },
           {
             description: 'Decorative Materials',
             quantity: 1,
+            unit: 'lot',
             unitPrice: 10000.00,
             totalPrice: 10000.00
           }
@@ -204,7 +219,7 @@ async function main() {
           }
         }
       })
-      console.log(`✅ Created voucher: ${voucher.title} (${voucher.status})`)
+      console.log(`✅ Created voucher: ${voucher.payee} (${voucher.status})`)
 
       // Create audit trail for the voucher
       await prisma.auditTrail.create({

@@ -28,6 +28,39 @@ export async function GET(request: NextRequest) {
     const notifications: Notification[] = []
     const userRole = session.user.role
 
+    // Get stored notifications from database
+    const storedNotifications = await prisma.notification.findMany({
+      where: {
+        userId: session.user.id
+      },
+      include: {
+        disbursementVoucher: {
+          select: {
+            id: true,
+            payee: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: "desc"
+      },
+      take: 10
+    })
+
+    // Add stored notifications to the list
+    storedNotifications.forEach(notification => {
+      notifications.push({
+        id: notification.id,
+        type: notification.type,
+        title: notification.title,
+        message: notification.message,
+        disbursementId: notification.disbursementVoucherId || undefined,
+        disbursementTitle: notification.disbursementVoucher?.payee || undefined,
+        createdAt: notification.createdAt.toISOString(),
+        priority: notification.priority as "high" | "medium" | "low"
+      })
+    })
+
     // Get disbursements that need attention based on user role
     switch (userRole) {
       case "DEPARTMENT_HEAD":
@@ -42,7 +75,10 @@ export async function GET(request: NextRequest) {
               }
             }
           },
-          include: {
+          select: {
+            id: true,
+            payee: true,
+            createdAt: true,
             createdBy: {
               select: { name: true, department: true }
             }
@@ -56,9 +92,9 @@ export async function GET(request: NextRequest) {
             id: `dept-${voucher.id}`,
             type: "approval_needed",
             title: "Validation Required",
-            message: `${voucher.title} from ${voucher.createdBy.name} needs validation`,
+            message: `${voucher.payee} from ${voucher.createdBy.name} needs validation`,
             disbursementId: voucher.id,
-            disbursementTitle: voucher.title,
+            disbursementTitle: voucher.payee,
             createdAt: voucher.createdAt.toISOString(),
             priority: "high"
           })
@@ -82,7 +118,10 @@ export async function GET(request: NextRequest) {
               }
             }
           },
-          include: {
+          select: {
+            id: true,
+            payee: true,
+            createdAt: true,
             createdBy: {
               select: { name: true, department: true }
             }
@@ -96,9 +135,9 @@ export async function GET(request: NextRequest) {
             id: `finance-${voucher.id}`,
             type: "approval_needed",
             title: "Approval Required",
-            message: `${voucher.title} from ${voucher.createdBy.name} needs approval`,
+            message: `${voucher.payee} from ${voucher.createdBy.name} needs approval`,
             disbursementId: voucher.id,
-            disbursementTitle: voucher.title,
+            disbursementTitle: voucher.payee,
             createdAt: voucher.createdAt.toISOString(),
             priority: "high"
           })
@@ -130,29 +169,38 @@ export async function GET(request: NextRequest) {
           include: {
             createdBy: { select: { name: true, role: true, department: true } }
           },
+          select: {
+            id: true,
+            payee: true,
+            status: true,
+            updatedAt: true,
+            createdAt: true,
+            createdBy: { select: { name: true, role: true, department: true } }
+          },
           orderBy: { updatedAt: "desc" },
           take: 10
         })
 
         mayorReviewVouchers.forEach(dv => {
-          let message = `Voucher "${dv.title}" from ${dv.createdBy.department || dv.createdBy.role} is available for review.`
+          let message = `Voucher "${dv.payee}" from ${dv.createdBy.department || dv.createdBy.role} is available for review.`
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           let priority: any = "medium"
           const actionType = "Review Required"
 
           if (dv.status === "PENDING") {
-            message = `New voucher "${dv.title}" from ${dv.createdBy.department || dv.createdBy.role} submitted for review.`
+            message = `New voucher "${dv.payee}" from ${dv.createdBy.department || dv.createdBy.role} submitted for review.`
             priority = "high"
           } else if (dv.status === "APPROVED") {
-            message = `Voucher "${dv.title}" from ${dv.createdBy.department || dv.createdBy.role} has been approved and ready for final review.`
+            message = `Voucher "${dv.payee}" from ${dv.createdBy.department || dv.createdBy.role} has been approved and ready for final review.`
             priority = "high"
           }
 
           notifications.push({
             id: `mayor-${dv.id}-${dv.updatedAt.getTime()}`,
             disbursementId: dv.id,
-            title: dv.title,
+            title: actionType,
             message: message,
+            disbursementTitle: dv.payee,
             status: dv.status,
             timestamp: dv.updatedAt,
             priority: priority,
@@ -182,7 +230,12 @@ export async function GET(request: NextRequest) {
               }
             }
           },
-          include: {
+          select: {
+            id: true,
+            payee: true,
+            status: true,
+            updatedAt: true,
+            createdAt: true,
             createdBy: { select: { name: true, role: true, department: true } },
             auditTrails: {
               include: { user: { select: { role: true } } },
@@ -239,7 +292,12 @@ export async function GET(request: NextRequest) {
               }
             }
           },
-          include: {
+          select: {
+            id: true,
+            payee: true,
+            status: true,
+            updatedAt: true,
+            createdAt: true,
             createdBy: { select: { name: true, role: true, department: true } },
             auditTrails: {
               include: { user: { select: { role: true } } },
@@ -296,7 +354,12 @@ export async function GET(request: NextRequest) {
               }
             }
           },
-          include: {
+          select: {
+            id: true,
+            payee: true,
+            status: true,
+            updatedAt: true,
+            createdAt: true,
             createdBy: { select: { name: true, role: true, department: true } },
             auditTrails: {
               include: { user: { select: { role: true } } },
@@ -342,7 +405,10 @@ export async function GET(request: NextRequest) {
               }
             }
           },
-          include: {
+          select: {
+            id: true,
+            payee: true,
+            updatedAt: true,
             createdBy: { select: { name: true, department: true } }
           },
           orderBy: { updatedAt: "desc" },
@@ -384,7 +450,12 @@ export async function GET(request: NextRequest) {
               }
             }
           },
-          include: {
+          select: {
+            id: true,
+            payee: true,
+            status: true,
+            updatedAt: true,
+            createdAt: true,
             createdBy: { select: { name: true, role: true, department: true } },
             auditTrails: {
               include: { user: { select: { role: true } } },
@@ -432,7 +503,11 @@ export async function GET(request: NextRequest) {
               in: ["VALIDATED", "APPROVED", "RELEASED", "REJECTED"]
             }
           },
-          include: {
+          select: {
+            id: true,
+            payee: true,
+            status: true,
+            updatedAt: true,
             approvals: {
               orderBy: { createdAt: "desc" },
               take: 1
@@ -450,22 +525,22 @@ export async function GET(request: NextRequest) {
           switch (voucher.status) {
             case "VALIDATED":
               title = "Voucher Validated"
-              message = `Your request "${voucher.title}" has been validated`
+              message = `Your request "${voucher.payee}" has been validated`
               priority = "medium"
               break
             case "APPROVED":
               title = "Voucher Approved"
-              message = `Your request "${voucher.title}" has been approved`
+              message = `Your request "${voucher.payee}" has been approved`
               priority = "medium"
               break
             case "RELEASED":
               title = "Voucher Released"
-              message = `Your request "${voucher.title}" has been released`
+              message = `Your request "${voucher.payee}" has been released`
               priority = "low"
               break
             case "REJECTED":
               title = "Voucher Rejected"
-              message = `Your request "${voucher.title}" has been rejected`
+              message = `Your request "${voucher.payee}" has been rejected`
               priority = "high"
               break
           }
@@ -476,7 +551,7 @@ export async function GET(request: NextRequest) {
             title,
             message,
             disbursementId: voucher.id,
-            disbursementTitle: voucher.title,
+            disbursementTitle: voucher.payee,
             createdAt: voucher.updatedAt.toISOString(),
             priority
           })
@@ -491,7 +566,11 @@ export async function GET(request: NextRequest) {
               in: ["PENDING", "VALIDATED", "APPROVED"]
             }
           },
-          include: {
+          select: {
+            id: true,
+            payee: true,
+            status: true,
+            createdAt: true,
             createdBy: {
               select: { name: true, department: true }
             },
@@ -507,13 +586,13 @@ export async function GET(request: NextRequest) {
           
           if (voucher.status === "PENDING") {
             title = "Validation Needed"
-            message = `${voucher.title} needs validation`
+            message = `${voucher.payee} needs validation`
           } else if (voucher.status === "VALIDATED") {
             title = "Approval Needed"
-            message = `${voucher.title} needs approval`
+            message = `${voucher.payee} needs approval`
           } else if (voucher.status === "APPROVED") {
             title = "Final Approval Needed"
-            message = `${voucher.title} needs final approval`
+            message = `${voucher.payee} needs final approval`
           }
 
           notifications.push({
@@ -522,7 +601,7 @@ export async function GET(request: NextRequest) {
             title,
             message,
             disbursementId: voucher.id,
-            disbursementTitle: voucher.title,
+            disbursementTitle: voucher.payee,
             createdAt: voucher.createdAt.toISOString(),
             priority: "medium"
           })

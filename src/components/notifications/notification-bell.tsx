@@ -146,7 +146,7 @@ export function NotificationBell() {
                           </span>
                         </div>
                         <p className="text-sm font-medium text-gray-900 mt-1">
-                          {notification.title}
+                          {notification.disbursementTitle}
                         </p>
                         <p className="text-sm text-gray-600 mt-1">
                           {notification.message}

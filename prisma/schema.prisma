@@ -62,6 +62,7 @@ model User {
   uploadedAttachments Attachment[]
   approvals           Approval[]
   auditTrails         AuditTrail[]
+  notifications       Notification[]
   accounts            Account[]
   sessions            Session[]
 
@@ -70,10 +71,12 @@ model User {
 
 model DisbursementVoucher {
   id          String        @id @default(cuid())
-  title       String
+  payee       String
+  address     String
   amount      Decimal       @db.Decimal(15, 2)
-  purpose     String
-  project     String?
+  particulars String
+  tags        String[]
+  sourceOffice String[]
   status      VoucherStatus @default(DRAFT)
   remarks     String?
   paymentMethod PaymentMethod?
@@ -87,12 +90,13 @@ model DisbursementVoucher {
   updatedAt DateTime @updatedAt
 
   // Relations
-  createdBy    User                @relation("CreatedBy", fields: [createdById], references: [id])
-  assignedTo   User?               @relation("AssignedTo", fields: [assignedToId], references: [id])
-  items        DisbursementItem[]
-  attachments  Attachment[]
-  approvals    Approval[]
-  auditTrails  AuditTrail[]
+  createdBy     User                @relation("CreatedBy", fields: [createdById], references: [id])
+  assignedTo    User?               @relation("AssignedTo", fields: [assignedToId], references: [id])
+  items         DisbursementItem[]
+  attachments   Attachment[]
+  approvals     Approval[]
+  auditTrails   AuditTrail[]
+  notifications Notification[]
 
   @@map("disbursement_vouchers")
 }
@@ -101,6 +105,7 @@ model DisbursementItem {
   id          String  @id @default(cuid())
   description String
   quantity    Int
+  unit        String
   unitPrice   Decimal @db.Decimal(10, 2)
   totalPrice  Decimal @db.Decimal(12, 2)
   
@@ -174,6 +179,26 @@ model AuditTrail {
   disbursementVoucher DisbursementVoucher? @relation(fields: [disbursementVoucherId], references: [id], onDelete: SetNull)
 
   @@map("audit_trails")
+}
+
+model Notification {
+  id      String @id @default(cuid())
+  type    String // "voucher_created", "approval_needed", etc.
+  title   String
+  message String
+  isRead  Boolean @default(false)
+  priority String @default("medium") // "high", "medium", "low"
+  
+  userId String
+  disbursementVoucherId String?
+  
+  createdAt DateTime @default(now())
+  
+  // Relations
+  user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  disbursementVoucher DisbursementVoucher? @relation(fields: [disbursementVoucherId], references: [id], onDelete: Cascade)
+  
+  @@map("notifications")
 }
 
 // NextAuth.js required models

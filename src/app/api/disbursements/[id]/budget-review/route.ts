@@ -6,7 +6,7 @@ import { z } from "zod"
 
 const budgetReviewSchema = z.object({
   action: z.enum(["BUDGET_REVIEWED"]),
-  comments: z.string().optional()
+  remarks: z.string().optional()
 })
 
 export async function POST(

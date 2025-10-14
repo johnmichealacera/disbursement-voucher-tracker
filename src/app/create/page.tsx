@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { useForm, useFieldArray } from "react-hook-form"
@@ -13,6 +13,13 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   Form,
   FormControl,
   FormField,
@@ -21,15 +28,19 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { formatCurrency } from "@/lib/utils"
-import { Plus, Trash2, Save, Send } from "lucide-react"
+import { Plus, Trash2, Save, Send, X } from "lucide-react"
 
 const createVoucherSchema = z.object({
-  title: z.string().min(1, "Title is required"),
-  purpose: z.string().min(1, "Purpose is required"),
-  project: z.string().optional(),
+  payee: z.string().min(1, "Payee is required"),
+  address: z.string().min(1, "Address is required"),
+  particulars: z.string().min(1, "Particulars is required"),
+  tags: z.array(z.string()).default([]),
+  sourceOffice: z.array(z.string()).default([]),
+  remarks: z.string().optional(),
   items: z.array(z.object({
     description: z.string().min(1, "Description is required"),
     quantity: z.number().min(1, "Quantity must be at least 1"),
+    unit: z.string().min(1, "Unit is required"),
     unitPrice: z.number().min(0.01, "Unit price must be greater than 0"),
     totalPrice: z.number().min(0.01, "Total price must be greater than 0")
   })).min(1, "At least one item is required")
@@ -42,17 +53,24 @@ export default function CreateVoucherPage() {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState("")
+  const [tagInput, setTagInput] = useState("")
+  const [offices, setOffices] = useState<string[]>([])
+  const [selectedOffice, setSelectedOffice] = useState("")
 
   const form = useForm<FormData>({
     resolver: zodResolver(createVoucherSchema),
     defaultValues: {
-      title: "",
-      purpose: "",
-      project: "",
+      payee: "",
+      address: "",
+      particulars: "",
+      tags: [],
+      sourceOffice: [],
+      remarks: "",
       items: [
         {
           description: "",
           quantity: 1,
+          unit: "",
           unitPrice: 0,
           totalPrice: 0
         }
@@ -79,6 +97,7 @@ export default function CreateVoucherPage() {
     append({
       description: "",
       quantity: 1,
+      unit: "",
       unitPrice: 0,
       totalPrice: 0
     })
@@ -89,6 +108,53 @@ export default function CreateVoucherPage() {
       remove(index)
     }
   }
+
+  const addTag = () => {
+    if (tagInput.trim()) {
+      const currentTags = form.getValues("tags")
+      if (!currentTags.includes(tagInput.trim())) {
+        form.setValue("tags", [...currentTags, tagInput.trim()])
+      }
+      setTagInput("")
+    }
+  }
+
+  const removeTag = (tagToRemove: string) => {
+    const currentTags = form.getValues("tags")
+    form.setValue("tags", currentTags.filter(tag => tag !== tagToRemove))
+  }
+
+  const addSourceOffice = () => {
+    if (selectedOffice) {
+      const currentOffices = form.getValues("sourceOffice")
+      if (!currentOffices.includes(selectedOffice)) {
+        form.setValue("sourceOffice", [...currentOffices, selectedOffice])
+      }
+      setSelectedOffice("")
+    }
+  }
+
+  const removeSourceOffice = (officeToRemove: string) => {
+    const currentOffices = form.getValues("sourceOffice")
+    form.setValue("sourceOffice", currentOffices.filter(office => office !== officeToRemove))
+  }
+
+  // Fetch offices on component mount
+  useEffect(() => {
+    const fetchOffices = async () => {
+      try {
+        const response = await fetch("/api/departments")
+        if (response.ok) {
+          const data = await response.json()
+          setOffices(data)
+        }
+      } catch (error) {
+        console.error("Error fetching offices:", error)
+      }
+    }
+
+    fetchOffices()
+  }, [])
 
   const onSubmit = async (data: FormData, isDraft = false) => {
     setIsSubmitting(true)
@@ -183,29 +249,45 @@ export default function CreateVoucherPage() {
                 <CardTitle>Basic Information</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="title"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Title *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Enter voucher title" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="payee"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Payee *</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Enter payee name" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="address"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Address *</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Enter payee address" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
                 <FormField
                   control={form.control}
-                  name="purpose"
+                  name="particulars"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Purpose *</FormLabel>
+                      <FormLabel>Particulars *</FormLabel>
                       <FormControl>
                         <Textarea 
-                          placeholder="Describe the purpose of this disbursement"
+                          placeholder="Enter specific details or particulars"
                           rows={3}
                           {...field} 
                         />
@@ -215,14 +297,98 @@ export default function CreateVoucherPage() {
                   )}
                 />
 
+                {/* Tags */}
+                <div>
+                  <FormLabel>Tags</FormLabel>
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Add a tag"
+                        value={tagInput}
+                        onChange={(e) => setTagInput(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
+                      />
+                      <Button type="button" onClick={addTag} variant="outline" size="sm">
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {form.watch("tags").map((tag, index) => (
+                        <div key={index} className="flex items-center gap-1 bg-blue-100 text-blue-800 px-2 py-1 rounded-md text-sm">
+                          {tag}
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-4 w-4 p-0 hover:bg-blue-200"
+                            onClick={() => removeTag(tag)}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Source Office */}
+                <div>
+                  <FormLabel>Source Office</FormLabel>
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <Select value={selectedOffice} onValueChange={setSelectedOffice}>
+                        <SelectTrigger className="flex-1">
+                          <SelectValue placeholder="Select an office" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {offices.map((office) => (
+                            <SelectItem key={office} value={office}>
+                              {office}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button 
+                        type="button" 
+                        onClick={addSourceOffice} 
+                        variant="outline" 
+                        size="sm"
+                        disabled={!selectedOffice}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {form.watch("sourceOffice").map((office, index) => (
+                        <div key={index} className="flex items-center gap-1 bg-green-100 text-green-800 px-2 py-1 rounded-md text-sm">
+                          {office}
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-4 w-4 p-0 hover:bg-green-200"
+                            onClick={() => removeSourceOffice(office)}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
                 <FormField
                   control={form.control}
-                  name="project"
+                  name="remarks"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Project (Optional)</FormLabel>
+                      <FormLabel>Remarks (Optional)</FormLabel>
                       <FormControl>
-                        <Input placeholder="Associated project name" {...field} />
+                        <Textarea 
+                          placeholder="Additional remarks or notes for review"
+                          rows={3}
+                          {...field} 
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -274,7 +440,7 @@ export default function CreateVoucherPage() {
                       )}
                     />
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                       <FormField
                         control={form.control}
                         name={`items.${index}.quantity`}
@@ -290,6 +456,23 @@ export default function CreateVoucherPage() {
                                   field.onChange(parseInt(e.target.value) || 0)
                                   setTimeout(() => calculateItemTotal(index), 0)
                                 }}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name={`items.${index}.unit`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Unit *</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="e.g., piece, kg, bundle"
+                                {...field}
                               />
                             </FormControl>
                             <FormMessage />

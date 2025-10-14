@@ -5,10 +5,12 @@ import { prisma } from "@/lib/prisma"
 import { z } from "zod"
 
 const updateDisbursementSchema = z.object({
-  title: z.string().min(1).optional(),
+  payee: z.string().min(1).optional(),
+  address: z.string().min(1).optional(),
   amount: z.number().positive().optional(),
-  purpose: z.string().min(1).optional(),
-  project: z.string().optional(),
+  particulars: z.string().min(1).optional(),
+  tags: z.array(z.string()).optional(),
+  sourceOffice: z.array(z.string()).optional(),
   status: z.enum(["DRAFT", "PENDING", "VALIDATED", "APPROVED", "RELEASED", "REJECTED"]).optional(),
   remarks: z.string().optional(),
   assignedToId: z.string().optional(),
@@ -16,6 +18,7 @@ const updateDisbursementSchema = z.object({
     id: z.string().optional(),
     description: z.string().min(1),
     quantity: z.number().positive(),
+    unit: z.string().min(1),
     unitPrice: z.number().positive(),
     totalPrice: z.number().positive()
   })).optional()
@@ -155,10 +158,12 @@ export async function PATCH(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updateData: any = {}
     
-    if (validatedData.title !== undefined) updateData.title = validatedData.title
+    if (validatedData.payee !== undefined) updateData.payee = validatedData.payee
+    if (validatedData.address !== undefined) updateData.address = validatedData.address
     if (validatedData.amount !== undefined) updateData.amount = validatedData.amount
-    if (validatedData.purpose !== undefined) updateData.purpose = validatedData.purpose
-    if (validatedData.project !== undefined) updateData.project = validatedData.project
+    if (validatedData.particulars !== undefined) updateData.particulars = validatedData.particulars
+    if (validatedData.tags !== undefined) updateData.tags = validatedData.tags
+    if (validatedData.sourceOffice !== undefined) updateData.sourceOffice = validatedData.sourceOffice
     if (validatedData.status !== undefined) updateData.status = validatedData.status
     if (validatedData.remarks !== undefined) updateData.remarks = validatedData.remarks
     if (validatedData.assignedToId !== undefined) updateData.assignedToId = validatedData.assignedToId
@@ -174,6 +179,7 @@ export async function PATCH(
         create: validatedData.items.map(item => ({
           description: item.description,
           quantity: item.quantity,
+          unit: item.unit,
           unitPrice: item.unitPrice,
           totalPrice: item.totalPrice
         }))

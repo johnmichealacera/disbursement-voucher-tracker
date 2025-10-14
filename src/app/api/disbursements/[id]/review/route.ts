@@ -6,7 +6,7 @@ import { z } from "zod"
 
 const reviewSchema = z.object({
   action: z.enum(["REVIEWED"]),
-  comments: z.string().optional()
+  remarks: z.string().optional()
 })
 
 export async function POST(
@@ -68,7 +68,7 @@ export async function POST(
         newValues: { 
           status: disbursement.status, // Status doesn't change, just reviewed
           reviewedBy: session.user.name,
-          reviewComments: validatedData.comments 
+          reviewRemarks: validatedData.remarks 
         },
         userId: session.user.id,
         disbursementVoucherId: disbursement.id

@@ -29,7 +29,7 @@ import { FileText, Plus, Search, Filter, Eye } from "lucide-react"
 
 interface Disbursement {
   id: string
-  title: string
+  payee: string
   amount: number
   status: string
   createdAt: string
@@ -104,7 +104,7 @@ function DisbursementsContent() {
   }
 
   const filteredDisbursements = disbursements.filter(disbursement =>
-    disbursement.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    disbursement?.payee?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     disbursement.createdBy.name.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
@@ -210,7 +210,7 @@ function DisbursementsContent() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Title</TableHead>
+                    <TableHead>Payee</TableHead>
                     <TableHead>Amount</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Requester</TableHead>
@@ -223,7 +223,7 @@ function DisbursementsContent() {
                   {filteredDisbursements.map((disbursement) => (
                     <TableRow key={disbursement.id}>
                       <TableCell>
-                        <div className="font-medium">{disbursement.title}</div>
+                        <div className="font-medium">{disbursement.payee}</div>
                       </TableCell>
                       <TableCell>
                         <div className="font-mono text-sm">
