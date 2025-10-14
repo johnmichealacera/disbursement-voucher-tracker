@@ -82,7 +82,7 @@ export async function POST(
         newValues: { 
           status: disbursement.status, // Status doesn't change, just reviewed
           treasuryReviewedBy: session.user.name,
-          treasuryReviewComments: validatedData.comments 
+          treasuryReviewComments: validatedData.remarks 
         },
         userId: session.user.id,
         disbursementVoucherId: disbursement.id

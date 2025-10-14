@@ -380,6 +380,20 @@ For technical support or questions:
 - **Responsive Design**: Optimized for all device types
 - **Intuitive Navigation**: Easy access to relevant functions for each role
 
+## 🐛 Recent Bug Fixes (v3.1)
+
+### **🔧 Critical Fixes**
+- **Fixed Prisma Validation Error**: Resolved conflicting `include`/`select` clauses in notifications API causing 500 errors for Mayor role
+- **Corrected Property References**: Fixed notification messages using correct `payee` property instead of non-existent `title` property
+- **TypeScript Form Schema Fix**: Resolved type mismatch in create voucher form for `tags` and `sourceOffice` array fields
+- **Code Quality Improvements**: Cleaned up unused imports and parameters to eliminate linting warnings
+
+### **🎯 Impact**
+- **Mayor Dashboard**: Now loads without errors and displays proper notifications
+- **Form Creation**: Disbursement voucher creation form works without TypeScript compilation errors
+- **Notification System**: All role-based notifications display correctly with proper voucher information
+- **Developer Experience**: Clean codebase with no linting warnings or errors
+
 ## 🔮 Future Enhancements
 
 - **Email Notifications**: Automated status change notifications

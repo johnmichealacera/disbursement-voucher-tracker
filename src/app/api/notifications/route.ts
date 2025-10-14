@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
@@ -18,7 +18,7 @@ interface Notification {
   priority: "high" | "medium" | "low"
 }
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const session = await getServerSession(authOptions)
     if (!session) {
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
         type: notification.type,
         title: notification.title,
         message: notification.message,
-        disbursementId: notification.disbursementVoucherId || undefined,
+        disbursementId: notification.disbursementVoucherId || "",
         disbursementTitle: notification.disbursementVoucher?.payee || undefined,
         createdAt: notification.createdAt.toISOString(),
         priority: notification.priority as "high" | "medium" | "low"
@@ -166,9 +166,6 @@ export async function GET(request: NextRequest) {
               }
             }
           },
-          include: {
-            createdBy: { select: { name: true, role: true, department: true } }
-          },
           select: {
             id: true,
             payee: true,
@@ -254,14 +251,14 @@ export async function GET(request: NextRequest) {
         )
 
         bacReviewVouchers.forEach(dv => {
-          const message = `GSO voucher "${dv.title}" has been reviewed by Mayor and is ready for BAC review.`
+          const message = `GSO voucher "${dv.payee}" has been reviewed by Mayor and is ready for BAC review.`
           const priority = "high"
           const actionType = "BAC Review Required"
 
           notifications.push({
             id: `bac-${dv.id}-${dv.updatedAt.getTime()}`,
             disbursementId: dv.id,
-            title: dv.title,
+            title: dv.payee,
             message: message,
             status: dv.status,
             timestamp: dv.updatedAt,
@@ -316,14 +313,14 @@ export async function GET(request: NextRequest) {
         )
 
         budgetReviewVouchers.forEach(dv => {
-          const message = `GSO voucher "${dv.title}" has been reviewed by BAC and is ready for Budget Office review.`
+          const message = `GSO voucher "${dv.payee}" has been reviewed by BAC and is ready for Budget Office review.`
           const priority = "high"
           const actionType = "Budget Review Required"
 
           notifications.push({
             id: `budget-${dv.id}-${dv.updatedAt.getTime()}`,
             disbursementId: dv.id,
-            title: dv.title,
+            title: dv.payee,
             message: message,
             status: dv.status,
             timestamp: dv.updatedAt,
@@ -378,14 +375,14 @@ export async function GET(request: NextRequest) {
         )
 
         treasuryReviewVouchers.forEach(dv => {
-          const message = `GSO voucher "${dv.title}" has been reviewed by Accounting and is ready for Treasury review.`
+          const message = `GSO voucher "${dv.payee}" has been reviewed by Accounting and is ready for Treasury review.`
           const priority = "high"
           const actionType = "Treasury Review Required"
 
           notifications.push({
             id: `treasury-${dv.id}-${dv.updatedAt.getTime()}`,
             disbursementId: dv.id,
-            title: dv.title,
+            title: dv.payee,
             message: message,
             status: dv.status,
             timestamp: dv.updatedAt,
@@ -419,9 +416,9 @@ export async function GET(request: NextRequest) {
           notifications.push({
             id: `treasury-release-${dv.id}-${dv.updatedAt.getTime()}`,
             disbursementId: dv.id,
-            title: dv.title,
-            message: `Voucher "${dv.title}" is approved and ready for release.`,
-            status: dv.status,
+            title: dv.payee,
+            message: `Voucher "${dv.payee}" is approved and ready for release.`,
+            status: "APPROVED",
             timestamp: dv.updatedAt,
             priority: "medium",
             actionType: "Ready for Release",
@@ -474,14 +471,14 @@ export async function GET(request: NextRequest) {
         )
 
         accountingReviewVouchers.forEach(dv => {
-          const message = `GSO voucher "${dv.title}" has been reviewed by Budget Office and is ready for Accounting review.`
+          const message = `GSO voucher "${dv.payee}" has been reviewed by Budget Office and is ready for Accounting review.`
           const priority = "high"
           const actionType = "Accounting Review Required"
 
           notifications.push({
             id: `accounting-${dv.id}-${dv.updatedAt.getTime()}`,
             disbursementId: dv.id,
-            title: dv.title,
+            title: dv.payee,
             message: message,
             status: dv.status,
             timestamp: dv.updatedAt,

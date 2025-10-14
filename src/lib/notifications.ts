@@ -64,6 +64,7 @@ export async function notifySourceOffices(
     // Find users with this role
     const users = await prisma.user.findMany({
       where: {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         role: role as any,
         isActive: true
       }

@@ -34,8 +34,8 @@ const createVoucherSchema = z.object({
   payee: z.string().min(1, "Payee is required"),
   address: z.string().min(1, "Address is required"),
   particulars: z.string().min(1, "Particulars is required"),
-  tags: z.array(z.string()).default([]),
-  sourceOffice: z.array(z.string()).default([]),
+  tags: z.array(z.string()),
+  sourceOffice: z.array(z.string()),
   remarks: z.string().optional(),
   items: z.array(z.object({
     description: z.string().min(1, "Description is required"),

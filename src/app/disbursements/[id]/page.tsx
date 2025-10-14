@@ -18,6 +18,13 @@ import {
 } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   Table,
   TableBody,
   TableCell,
@@ -39,7 +46,10 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
-  Eye
+  Eye,
+  MessageSquare,
+  Plus,
+  X
 } from "lucide-react"
 
 interface DisbursementItem {
@@ -113,6 +123,11 @@ export default function DisbursementDetailPage() {
   const [showReviewDialog, setShowReviewDialog] = useState(false)
   const [reviewRemarks, setReviewRemarks] = useState("")
   const [reviewType, setReviewType] = useState<"REVIEW" | "BUDGET_REVIEW" | "TREASURY_REVIEW" | "ACCOUNTING_REVIEW" | "BAC_REVIEW">("REVIEW")
+  const [showRemarksDialog, setShowRemarksDialog] = useState(false)
+  const [remarksText, setRemarksText] = useState("")
+  const [selectedOffices, setSelectedOffices] = useState<string[]>([])
+  const [availableOffices, setAvailableOffices] = useState<string[]>([])
+  const [isSubmittingRemarks, setIsSubmittingRemarks] = useState(false)
 
   const fetchDisbursement = async () => {
     try {
@@ -351,9 +366,68 @@ export default function DisbursementDetailPage() {
     }
   }
 
+  const handleSubmitRemarks = async () => {
+    if (!disbursement || !remarksText.trim() || selectedOffices.length === 0) return
+
+    setIsSubmittingRemarks(true)
+    setError("")
+
+    try {
+      const response = await fetch(`/api/disbursements/${id}/submit-remarks`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          remarks: remarksText,
+          targetOffices: selectedOffices
+        }),
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        setDisbursement(result.disbursement)
+        setShowRemarksDialog(false)
+        setRemarksText("")
+        setSelectedOffices([])
+      } else {
+        const errorData = await response.json()
+        setError(errorData.error || "Failed to submit remarks")
+      }
+    } catch (error) {
+      console.error("Error submitting remarks:", error)
+      setError("Failed to submit remarks")
+    } finally {
+      setIsSubmittingRemarks(false)
+    }
+  }
+
+  const addOffice = (office: string) => {
+    if (office && !selectedOffices.includes(office)) {
+      setSelectedOffices([...selectedOffices, office])
+    }
+  }
+
+  const removeOffice = (officeToRemove: string) => {
+    setSelectedOffices(selectedOffices.filter(office => office !== officeToRemove))
+  }
+
+  const fetchAvailableOffices = async () => {
+    try {
+      const response = await fetch("/api/departments")
+      if (response.ok) {
+        const data = await response.json()
+        setAvailableOffices(data)
+      }
+    } catch (error) {
+      console.error("Error fetching offices:", error)
+    }
+  }
+
   useEffect(() => {
     if (id) {
       fetchDisbursement()
+      fetchAvailableOffices()
     }
   }, [id])
 
@@ -762,6 +836,14 @@ export default function DisbursementDetailPage() {
                 Edit
               </Button>
             )}
+            <Button 
+              variant="outline"
+              onClick={() => setShowRemarksDialog(true)}
+              className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
+            >
+              <MessageSquare className="mr-2 h-4 w-4" />
+              Submit Remarks
+            </Button>
           </div>
         </div>
 
@@ -990,6 +1072,7 @@ export default function DisbursementDetailPage() {
                         case "BUDGET_REVIEW": return "reviewed the disbursement (Budget Office)"
                         case "ACCOUNTING_REVIEW": return "reviewed the disbursement (Accounting)"
                         case "TREASURY_REVIEW": return "reviewed the disbursement (Treasury)"
+                        case "SUBMIT_REMARKS": return "submitted remarks to source offices"
                         default: return `${action.toLowerCase()}d the disbursement`
                       }
                     }
@@ -1007,6 +1090,7 @@ export default function DisbursementDetailPage() {
                         case "BUDGET_REVIEW": return "bg-orange-600"
                         case "ACCOUNTING_REVIEW": return "bg-green-600"
                         case "TREASURY_REVIEW": return "bg-indigo-600"
+                        case "SUBMIT_REMARKS": return "bg-blue-600"
                         default: return "bg-gray-500"
                       }
                     }
@@ -1020,6 +1104,29 @@ export default function DisbursementDetailPage() {
                             <span className="text-gray-600">({trail.user.role})</span>{" "}
                             {getActionDescription(trail.action)}
                           </p>
+                          
+                          {/* Show remarks details for SUBMIT_REMARKS action */}
+                          {trail.action === "SUBMIT_REMARKS" && trail.newValues && (
+                            <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                              <div className="mb-2">
+                                <span className="text-xs font-medium text-blue-800">Remarks:</span>
+                                <p className="text-sm text-blue-900 mt-1">{trail.newValues.remarks}</p>
+                              </div>
+                              {trail.newValues.targetOffices && trail.newValues.targetOffices.length > 0 && (
+                                <div>
+                                  <span className="text-xs font-medium text-blue-800">Sent to:</span>
+                                  <div className="flex flex-wrap gap-1 mt-1">
+                                    {trail.newValues.targetOffices.map((office: string, index: number) => (
+                                      <span key={index} className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800">
+                                        {office}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          
                           <p className="text-xs text-gray-500 mt-1">
                             <Calendar className="inline w-3 h-3 mr-1" />
                             {formatDateTime(trail.timestamp)}
@@ -1038,6 +1145,110 @@ export default function DisbursementDetailPage() {
             </Card>
           </div>
         </div>
+
+        {/* Remarks Dialog */}
+        <Dialog open={showRemarksDialog} onOpenChange={setShowRemarksDialog}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center">
+                <MessageSquare className="mr-2 h-5 w-5" />
+                Submit Remarks
+              </DialogTitle>
+              <DialogDescription>
+                Submit remarks to specific offices regarding this disbursement voucher.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-2 block">
+                  Remarks *
+                </label>
+                <Textarea
+                  placeholder="Enter your remarks or feedback..."
+                  value={remarksText}
+                  onChange={(e) => setRemarksText(e.target.value)}
+                  rows={4}
+                  className="w-full"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-2 block">
+                  Target Offices *
+                </label>
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <Select onValueChange={addOffice}>
+                      <SelectTrigger className="flex-1">
+                        <SelectValue placeholder="Select an office to notify" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableOffices
+                          .filter(office => !selectedOffices.includes(office))
+                          .map((office) => (
+                            <SelectItem key={office} value={office}>
+                              {office}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  {selectedOffices.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {selectedOffices.map((office, index) => (
+                        <div key={index} className="flex items-center gap-1 bg-blue-100 text-blue-800 px-3 py-1 rounded-md text-sm">
+                          {office}
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-4 w-4 p-0 hover:bg-blue-200"
+                            onClick={() => removeOffice(office)}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowRemarksDialog(false)
+                  setRemarksText("")
+                  setSelectedOffices([])
+                }}
+                disabled={isSubmittingRemarks}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSubmitRemarks}
+                disabled={isSubmittingRemarks || !remarksText.trim() || selectedOffices.length === 0}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                {isSubmittingRemarks ? (
+                  <>
+                    <Clock className="mr-2 h-4 w-4 animate-spin" />
+                    Submitting...
+                  </>
+                ) : (
+                  <>
+                    <Send className="mr-2 h-4 w-4" />
+                    Submit Remarks
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </MainLayout>
   )
