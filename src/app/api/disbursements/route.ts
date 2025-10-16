@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma"
 import { z } from "zod"
 import { VoucherStatus } from "@prisma/client"
 import { notifySourceOffices } from "@/lib/notifications"
+import { sendWorkflowNotifications } from "@/lib/workflow-notifications"
 
 const createDisbursementSchema = z.object({
   payee: z.string().min(1, "Payee is required"),
@@ -194,7 +195,8 @@ export async function POST(request: NextRequest) {
             id: true,
             name: true,
             email: true,
-            department: true
+            department: true,
+            role: true,
           }
         },
         items: true
@@ -222,6 +224,17 @@ export async function POST(request: NextRequest) {
         createdBy: disbursement.createdBy
       })
     }
+
+    // Send workflow notifications for voucher creation
+    await sendWorkflowNotifications({
+      disbursementId: disbursement.id,
+      payee: disbursement.payee,
+      amount: Number(disbursement.amount),
+      action: validatedData.status === "PENDING" ? "SUBMIT" : "CREATE",
+      performedBy: session.user.name,
+      performedByRole: disbursement.createdBy.role,
+      disbursementCreatedBy: disbursement.createdBy.role
+    })
 
     return NextResponse.json(disbursement, { status: 201 })
   } catch (error) {

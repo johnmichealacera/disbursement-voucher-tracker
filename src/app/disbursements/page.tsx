@@ -30,6 +30,7 @@ import { FileText, Plus, Search, Filter, Eye } from "lucide-react"
 interface Disbursement {
   id: string
   payee: string
+  particulars: string
   amount: number
   status: string
   createdAt: string
@@ -211,10 +212,11 @@ function DisbursementsContent() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Payee</TableHead>
+                    <TableHead>Particulars</TableHead>
+                    <TableHead>Department</TableHead>
                     <TableHead>Amount</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Requester</TableHead>
-                    <TableHead>Department</TableHead>
                     <TableHead>Created</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
@@ -224,6 +226,16 @@ function DisbursementsContent() {
                     <TableRow key={disbursement.id}>
                       <TableCell>
                         <div className="font-medium">{disbursement.payee}</div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm text-gray-600 max-w-xs truncate">
+                          {disbursement.particulars}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm text-gray-600">
+                          {disbursement.createdBy.department || "N/A"}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="font-mono text-sm">
@@ -237,11 +249,6 @@ function DisbursementsContent() {
                       </TableCell>
                       <TableCell>
                         <div className="text-sm">{disbursement.createdBy.name}</div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm text-gray-600">
-                          {disbursement.createdBy.department || "N/A"}
-                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="text-sm text-gray-600">

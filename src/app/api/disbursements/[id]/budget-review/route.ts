@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { z } from "zod"
+import { sendWorkflowNotifications } from "@/lib/workflow-notifications"
 
 const budgetReviewSchema = z.object({
   action: z.enum(["BUDGET_REVIEWED"]),
@@ -87,6 +88,18 @@ export async function POST(
         userId: session.user.id,
         disbursementVoucherId: disbursement.id
       }
+    })
+
+    // Send workflow notifications
+    await sendWorkflowNotifications({
+      disbursementId: disbursement.id,
+      payee: disbursement.payee,
+      amount: Number(disbursement.amount),
+      action: "BUDGET_REVIEW",
+      performedBy: session.user.name,
+      performedByRole: "BUDGET",
+      disbursementCreatedBy: disbursement.createdBy.role,
+      remarks: validatedData.remarks
     })
 
     // Get updated disbursement with all relations

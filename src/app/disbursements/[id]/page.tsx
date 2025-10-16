@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter, useParams } from "next/navigation"
 import { MainLayout } from "@/components/layout/main-layout"
@@ -17,6 +17,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
+import { Input } from "@/components/ui/input"
 import {
   Select,
   SelectContent,
@@ -33,6 +34,8 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { formatCurrency, formatDate, formatDateTime, getStatusColor } from "@/lib/utils"
+import { ProgressBar } from "@/components/ui/progress-bar"
+import { calculateProgress } from "@/lib/progress-utils"
 import { 
   ArrowLeft, 
   Send, 
@@ -117,6 +120,12 @@ export default function DisbursementDetailPage() {
 
   const [disbursement, setDisbursement] = useState<Disbursement | null>(null)
   const [loading, setLoading] = useState(true)
+  
+  // Memoized progress calculation that updates when disbursement changes
+  const progressSteps = useMemo(() => {
+    if (!disbursement) return []
+    return calculateProgress(disbursement as unknown as Parameters<typeof calculateProgress>[0])
+  }, [disbursement])
   const [error, setError] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isApproving, setIsApproving] = useState(false)
@@ -128,6 +137,7 @@ export default function DisbursementDetailPage() {
   const [selectedOffices, setSelectedOffices] = useState<string[]>([])
   const [availableOffices, setAvailableOffices] = useState<string[]>([])
   const [isSubmittingRemarks, setIsSubmittingRemarks] = useState(false)
+  const [checkNumber, setCheckNumber] = useState("")
 
   const fetchDisbursement = async () => {
     try {
@@ -334,8 +344,13 @@ export default function DisbursementDetailPage() {
     }
   }
 
-  const handleTreasuryReview = async () => {
+  const handleTreasuryAction = async (action: "CHECK_ISSUANCE" | "MARK_RELEASED") => {
     if (!disbursement) return
+
+    if (action === "CHECK_ISSUANCE" && !checkNumber.trim()) {
+      setError("Check number is required")
+      return
+    }
 
     setIsApproving(true)
     setError("")
@@ -347,20 +362,22 @@ export default function DisbursementDetailPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          action: "TREASURY_REVIEWED"
+          action,
+          checkNumber: action === "CHECK_ISSUANCE" ? checkNumber : undefined
         }),
       })
 
       if (response.ok) {
         const updatedDisbursement = await response.json()
         setDisbursement(updatedDisbursement)
+        setCheckNumber("") // Clear check number after successful issuance
       } else {
         const errorData = await response.json()
-        setError(errorData.error || "Failed to Treasury review voucher")
+        setError(errorData.error || "Failed to process Treasury action")
       }
     } catch (error) {
-      console.error("Error Treasury reviewing disbursement:", error)
-      setError("Failed to Treasury review voucher")
+      console.error("Error processing Treasury action:", error)
+      setError("Failed to process Treasury action")
     } finally {
       setIsApproving(false)
     }
@@ -618,18 +635,31 @@ export default function DisbursementDetailPage() {
       trail.user.role === "ACCOUNTING"
     )
 
-  // Treasury review logic - only for GSO vouchers after Accounting review
-  const canTreasuryReview = session.user.role === "TREASURY" && 
-    disbursement && 
-    disbursement.createdBy.role === "GSO" &&
-    ["PENDING", "VALIDATED", "APPROVED"].includes(disbursement.status) &&
-    accountingHasReviewedGso
+  // Check Treasury actions based on current state
+  const hasCheckIssuance = disbursement?.auditTrails.some(trail => 
+    trail.action === "CHECK_ISSUANCE" && trail.user.role === "TREASURY"
+  )
+  const hasMarkReleased = disbursement?.auditTrails.some(trail => 
+    trail.action === "MARK_RELEASED" && trail.user.role === "TREASURY"
+  )
 
-  // Show Treasury review button for GSO vouchers (but may be disabled)
-  const showTreasuryReviewButton = session.user.role === "TREASURY" && 
+  const canIssueCheck = session.user.role === "TREASURY" && 
     disbursement && 
     disbursement.createdBy.role === "GSO" &&
-    ["PENDING", "VALIDATED", "APPROVED"].includes(disbursement.status)
+    accountingHasReviewedGso && 
+    !hasCheckIssuance && 
+    !hasMarkReleased
+
+  const canMarkReleased = session.user.role === "TREASURY" && 
+    disbursement && 
+    disbursement.createdBy.role === "GSO" &&
+    hasCheckIssuance && 
+    !hasMarkReleased
+
+  // Show Treasury action button for GSO vouchers
+  const showTreasuryActionButton = session.user.role === "TREASURY" && 
+    disbursement && 
+    disbursement.createdBy.role === "GSO"
 
   // Check if BAC has already reviewed this voucher
   const bacHasReviewed = disbursement && session.user.role === "BAC" &&
@@ -805,30 +835,46 @@ export default function DisbursementDetailPage() {
                  "Accounting Review"}
               </Button>
             )}
-            {showTreasuryReviewButton && (
-              <Button 
-                onClick={handleTreasuryReview}
-                disabled={isApproving || treasuryHasReviewed || !accountingHasReviewedGso}
-                className={treasuryHasReviewed 
-                  ? "bg-gray-400 hover:bg-gray-400 cursor-not-allowed" 
-                  : !accountingHasReviewedGso
-                  ? "bg-gray-300 hover:bg-gray-300 cursor-not-allowed"
-                  : "bg-indigo-600 hover:bg-indigo-700"
-                }
-                title={!accountingHasReviewedGso ? "Waiting for Accounting review" : ""}
-              >
-                {treasuryHasReviewed ? (
-                  <CheckCircle className="mr-2 h-4 w-4" />
-                ) : !accountingHasReviewedGso ? (
-                  <Clock className="mr-2 h-4 w-4" />
-                ) : (
-                  <Eye className="mr-2 h-4 w-4" />
+            {showTreasuryActionButton && (
+              <div className="space-y-2">
+                {canIssueCheck && (
+                  <div className="flex items-center space-x-2">
+                    <Input
+                      placeholder="Enter check number"
+                      value={checkNumber}
+                      onChange={(e) => setCheckNumber(e.target.value)}
+                      className="w-48"
+                    />
+                    <Button 
+                      onClick={() => handleTreasuryAction("CHECK_ISSUANCE")}
+                      disabled={isApproving || !checkNumber.trim()}
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      {isApproving ? "Processing..." : "Check Number Issuance"}
+                    </Button>
+                  </div>
                 )}
-                {isApproving ? "Processing..." : 
-                 treasuryHasReviewed ? "Treasury Reviewed" : 
-                 !accountingHasReviewedGso ? "Awaiting Accounting Review" : 
-                 "Treasury Review"}
-              </Button>
+                
+                {canMarkReleased && (
+                  <Button 
+                    onClick={() => handleTreasuryAction("MARK_RELEASED")}
+                    disabled={isApproving}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    {isApproving ? "Processing..." : "Available for Release"}
+                  </Button>
+                )}
+                
+                {hasMarkReleased && (
+                  <Button 
+                    disabled
+                    className="bg-gray-400 hover:bg-gray-400 cursor-not-allowed"
+                  >
+                    <CheckCircle className="mr-2 h-4 w-4" />
+                    Released
+                  </Button>
+                )}
+              </div>
             )}
             {canEdit && (
               <Button variant="outline">
@@ -857,6 +903,19 @@ export default function DisbursementDetailPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
+            {/* Progress Bar */}
+            <Card key={`progress-${disbursement?.id}-${disbursement?.status}-${disbursement?.auditTrails?.length || 0}`}>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Clock className="mr-2 h-5 w-5" />
+                  Approval Progress
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ProgressBar steps={progressSteps} />
+              </CardContent>
+            </Card>
+            
             {/* Basic Information */}
             <Card>
               <CardHeader>
@@ -1059,7 +1118,7 @@ export default function DisbursementDetailPage() {
               <CardContent>
                 <div className="space-y-4">
                   {disbursement.auditTrails.slice(0, 10).map((trail) => {
-                    const getActionDescription = (action: string) => {
+                    const getActionDescription = (action: string, trail: { newValues?: { checkNumber?: string; releaseDate?: string; treasuryActionComments?: string } }) => {
                       switch (action.toUpperCase()) {
                         case "CREATE": return "created the disbursement"
                         case "SUBMIT": return "submitted for review"
@@ -1072,6 +1131,10 @@ export default function DisbursementDetailPage() {
                         case "BUDGET_REVIEW": return "reviewed the disbursement (Budget Office)"
                         case "ACCOUNTING_REVIEW": return "reviewed the disbursement (Accounting)"
                         case "TREASURY_REVIEW": return "reviewed the disbursement (Treasury)"
+                        case "CHECK_ISSUANCE": 
+                          const checkNumber = trail.newValues?.checkNumber
+                          return checkNumber ? `issued check #${checkNumber}` : "issued check"
+                        case "MARK_RELEASED": return "released the disbursement"
                         case "SUBMIT_REMARKS": return "submitted remarks to source offices"
                         default: return `${action.toLowerCase()}d the disbursement`
                       }
@@ -1090,6 +1153,8 @@ export default function DisbursementDetailPage() {
                         case "BUDGET_REVIEW": return "bg-orange-600"
                         case "ACCOUNTING_REVIEW": return "bg-green-600"
                         case "TREASURY_REVIEW": return "bg-indigo-600"
+                        case "CHECK_ISSUANCE": return "bg-emerald-500"
+                        case "MARK_RELEASED": return "bg-green-600"
                         case "SUBMIT_REMARKS": return "bg-blue-600"
                         default: return "bg-gray-500"
                       }
@@ -1102,7 +1167,7 @@ export default function DisbursementDetailPage() {
                           <p className="text-sm text-gray-900">
                             <span className="font-medium">{trail.user.name}</span>{" "}
                             <span className="text-gray-600">({trail.user.role})</span>{" "}
-                            {getActionDescription(trail.action)}
+                            {getActionDescription(trail.action, trail)}
                           </p>
                           
                           {/* Show remarks details for SUBMIT_REMARKS action */}
@@ -1122,6 +1187,38 @@ export default function DisbursementDetailPage() {
                                       </span>
                                     ))}
                                   </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Show check details for CHECK_ISSUANCE action */}
+                          {trail.action === "CHECK_ISSUANCE" && trail.newValues && (
+                            <div className="mt-2 p-3 bg-emerald-50 border border-emerald-200 rounded-md">
+                              <div className="mb-2">
+                                <span className="text-xs font-medium text-emerald-800">Check Number:</span>
+                                <p className="text-sm font-mono text-emerald-900 mt-1">{trail.newValues.checkNumber}</p>
+                              </div>
+                              {trail.newValues.treasuryActionComments && (
+                                <div>
+                                  <span className="text-xs font-medium text-emerald-800">Comments:</span>
+                                  <p className="text-sm text-emerald-900 mt-1">{trail.newValues.treasuryActionComments}</p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Show release details for MARK_RELEASED action */}
+                          {trail.action === "MARK_RELEASED" && trail.newValues && (
+                            <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-md">
+                              <div className="mb-2">
+                                <span className="text-xs font-medium text-green-800">Released Date:</span>
+                                <p className="text-sm text-green-900 mt-1">{formatDateTime(trail.newValues.releaseDate)}</p>
+                              </div>
+                              {trail.newValues.treasuryActionComments && (
+                                <div>
+                                  <span className="text-xs font-medium text-green-800">Comments:</span>
+                                  <p className="text-sm text-green-900 mt-1">{trail.newValues.treasuryActionComments}</p>
                                 </div>
                               )}
                             </div>

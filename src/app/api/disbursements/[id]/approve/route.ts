@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma"
 
 import { z } from "zod"
 import { UserRole, VoucherStatus } from "@prisma/client"
+import { sendWorkflowNotifications } from "@/lib/workflow-notifications"
 
 const approvalSchema = z.object({
   status: z.enum(["APPROVED", "REJECTED"]),
@@ -59,6 +60,13 @@ export async function POST(
       include: {
         approvals: {
           orderBy: { level: "asc" }
+        },
+        createdBy: {
+          select: {
+            id: true,
+            name: true,
+            role: true
+          }
         }
       }
     })
@@ -137,7 +145,8 @@ export async function POST(
             id: true,
             name: true,
             email: true,
-            department: true
+            department: true,
+            role: true,
           }
         },
         approvals: {
@@ -169,6 +178,18 @@ export async function POST(
         userId: session.user.id,
         disbursementVoucherId: id
       }
+    })
+
+    // Send workflow notifications
+    await sendWorkflowNotifications({
+      disbursementId: id,
+      payee: disbursement.payee,
+      amount: Number(disbursement.amount),
+      action: validatedData.status === "APPROVED" ? "APPROVE" : "REJECT",
+      performedBy: session.user.name,
+      performedByRole: session.user.role,
+      disbursementCreatedBy: disbursement.createdBy.role,
+      remarks: validatedData.remarks
     })
 
     return NextResponse.json({

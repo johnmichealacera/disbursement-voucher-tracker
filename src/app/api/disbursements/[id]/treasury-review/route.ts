@@ -3,9 +3,12 @@ import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { z } from "zod"
+import { sendWorkflowNotifications } from "@/lib/workflow-notifications"
+import { VoucherStatus } from "@prisma/client"
 
 const treasuryReviewSchema = z.object({
-  action: z.enum(["TREASURY_REVIEWED"]),
+  action: z.enum(["CHECK_ISSUANCE", "MARK_RELEASED"]),
+  checkNumber: z.string().optional(),
   remarks: z.string().optional()
 })
 
@@ -46,47 +49,105 @@ export async function POST(
       return NextResponse.json({ error: "Disbursement not found" }, { status: 404 })
     }
 
-    // Check if voucher is from GSO
-    if (disbursement.createdBy.role !== "GSO") {
-      return NextResponse.json({ 
-        error: "Treasury Office can only review vouchers from GSO department" 
-      }, { status: 403 })
+    // Handle different actions
+    if (validatedData.action === "CHECK_ISSUANCE") {
+      // For check issuance, check if it's a GSO voucher and Accounting has reviewed
+      if (disbursement.createdBy.role !== "GSO") {
+        return NextResponse.json({ 
+          error: "Treasury Office can only issue checks for GSO department vouchers" 
+        }, { status: 403 })
+      }
+
+      // Check if Accounting has already reviewed this voucher
+      const accountingHasReviewed = disbursement.auditTrails.some(trail => 
+        trail.action === "ACCOUNTING_REVIEW" && trail.user.role === "ACCOUNTING"
+      )
+
+      if (!accountingHasReviewed) {
+        return NextResponse.json({ 
+          error: "Treasury Office can only issue checks after Accounting has reviewed the voucher" 
+        }, { status: 400 })
+      }
+
+      // Check if check number is provided
+      if (!validatedData.checkNumber || validatedData.checkNumber.trim() === "") {
+        return NextResponse.json({ 
+          error: "Check number is required for check issuance" 
+        }, { status: 400 })
+      }
     }
 
-    // Check if voucher is in a reviewable status
-    const reviewableStatuses = ["PENDING", "VALIDATED", "APPROVED"]
-    if (!reviewableStatuses.includes(disbursement.status)) {
-      return NextResponse.json({ 
-        error: `Cannot review voucher with status ${disbursement.status}` 
-      }, { status: 400 })
+    if (validatedData.action === "MARK_RELEASED") {
+      // For marking as released, check if it's ready for release
+      if (disbursement.status !== "APPROVED" && !disbursement.checkNumber) {
+        return NextResponse.json({ 
+          error: "Voucher must be approved and have a check number before it can be released" 
+        }, { status: 400 })
+      }
     }
 
-    // Check if Accounting has already reviewed this voucher
-    const accountingHasReviewed = disbursement.auditTrails.some(trail => 
-      trail.action === "ACCOUNTING_REVIEW" && trail.user.role === "ACCOUNTING"
-    )
+    // Update disbursement based on action
+    let updateData: {
+      checkNumber?: string
+      status?: VoucherStatus
+      releaseDate?: Date
+    } = {}
+    let auditAction = ""
+    let auditMessage = ""
 
-    if (!accountingHasReviewed) {
-      return NextResponse.json({ 
-        error: "Treasury Office can only review GSO vouchers after Accounting has reviewed them" 
-      }, { status: 400 })
+    if (validatedData.action === "CHECK_ISSUANCE") {
+      updateData = {
+        checkNumber: validatedData.checkNumber,
+        status: "APPROVED" // Mark as approved when check is issued
+      }
+      auditAction = "CHECK_ISSUANCE"
+      auditMessage = `Check issued with number: ${validatedData.checkNumber}`
+    } else if (validatedData.action === "MARK_RELEASED") {
+      updateData = {
+        status: "RELEASED",
+        releaseDate: new Date()
+      }
+      auditAction = "MARK_RELEASED"
+      auditMessage = "Voucher marked as released"
     }
 
-    // Create audit trail for the Treasury review
+    // Update the disbursement
+    await prisma.disbursementVoucher.update({
+      where: { id },
+      data: updateData
+    })
+
+    // Create audit trail
     await prisma.auditTrail.create({
       data: {
-        action: "TREASURY_REVIEW",
+        action: auditAction,
         entityType: "DisbursementVoucher",
         entityId: disbursement.id,
-        oldValues: { status: disbursement.status },
+        oldValues: { status: disbursement.status, checkNumber: disbursement.checkNumber },
         newValues: { 
-          status: disbursement.status, // Status doesn't change, just reviewed
-          treasuryReviewedBy: session.user.name,
-          treasuryReviewComments: validatedData.remarks 
+          status: updateData.status,
+          checkNumber: updateData.checkNumber,
+          releaseDate: updateData.releaseDate,
+          treasuryActionBy: session.user.name,
+          treasuryActionComments: validatedData.remarks,
+          actionMessage: auditMessage
         },
         userId: session.user.id,
         disbursementVoucherId: disbursement.id
       }
+    })
+
+    // Send workflow notifications
+    await sendWorkflowNotifications({
+      disbursementId: disbursement.id,
+      payee: disbursement.payee,
+      amount: Number(disbursement.amount),
+      action: auditAction,
+      performedBy: session.user.name,
+      performedByRole: "TREASURY",
+      disbursementCreatedBy: disbursement.createdBy.role,
+      remarks: validatedData.remarks,
+      checkNumber: updateData.checkNumber
     })
 
     // Get updated disbursement with all relations

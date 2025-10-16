@@ -394,6 +394,44 @@ For technical support or questions:
 - **Notification System**: All role-based notifications display correctly with proper voucher information
 - **Developer Experience**: Clean codebase with no linting warnings or errors
 
+## ✨ Latest Updates (v3.2)
+
+### **🏦 Enhanced Treasury Workflow**
+- **Check Number Issuance**: Treasury can now issue specific check numbers for approved disbursements
+- **Release Management**: Three-step Treasury process: Check Issuance → Available for Release → Released
+- **Check Number Tracking**: Full audit trail of check numbers issued and release dates
+- **Input Validation**: Required check number field with proper validation before issuance
+
+### **📊 Advanced Progress Tracking**
+- **Real-time Progress Bar**: Visual progress indicator showing completion percentage toward Treasury approval
+- **Workflow-specific Progress**: Different progress calculations for Standard, GSO, and HR workflows
+- **Reactive Updates**: Progress bar updates instantly when review buttons are clicked
+- **Smart State Detection**: Accurate progress calculation based on audit trail actions
+
+### **🔔 Comprehensive Workflow Notifications**
+- **Multi-department Notifications**: All departments in the workflow receive notifications when reviews are completed
+- **Smart Department Detection**: Automatically identifies relevant departments based on workflow type
+- **Contextual Messages**: Detailed notification messages with action context and financial details
+- **Priority-based System**: High priority for rejections/releases, medium for approvals, low for submissions
+
+### **📋 Enhanced Activity Log**
+- **Check Details Display**: Shows specific check numbers issued by Treasury
+- **Release Information**: Displays release dates and Treasury comments
+- **Visual Indicators**: Color-coded action types with emerald for check issuance and green for releases
+- **Detailed Information Cards**: Rich context for Treasury actions with check numbers and comments
+
+### **🎯 Improved Dashboard & List Views**
+- **Comprehensive Information Display**: Shows payee, particulars, department, and amount in dashboard
+- **Better Information Hierarchy**: Most important details displayed prominently
+- **Enhanced List View**: Reorganized columns with particulars and department information
+- **Consistent Experience**: Uniform information display across all views
+
+### **🔧 Technical Improvements**
+- **Type Safety**: Enhanced TypeScript interfaces for better type checking
+- **API Integration**: Updated all review endpoints to send workflow notifications
+- **Error Handling**: Improved error handling and validation across all components
+- **Code Quality**: Cleaned up unused imports and improved code organization
+
 ## 🔮 Future Enhancements
 
 - **Email Notifications**: Automated status change notifications

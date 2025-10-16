@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { sendWorkflowNotifications } from "@/lib/workflow-notifications"
 
 export async function POST(
   request: NextRequest,
@@ -23,7 +24,8 @@ export async function POST(
             id: true,
             name: true,
             email: true,
-            department: true
+            department: true,
+            role: true,
           }
         },
         items: true
@@ -65,7 +67,8 @@ export async function POST(
             id: true,
             name: true,
             email: true,
-            department: true
+            department: true,
+            role: true,
           }
         },
         items: true,
@@ -95,6 +98,17 @@ export async function POST(
         userId: session.user.id,
         disbursementVoucherId: disbursement.id
       }
+    })
+
+    // Send workflow notifications
+    await sendWorkflowNotifications({
+      disbursementId: disbursement.id,
+      payee: disbursement.payee,
+      amount: Number(disbursement.amount),
+      action: "SUBMIT",
+      performedBy: session.user.name,
+      performedByRole: disbursement.createdBy.role,
+      disbursementCreatedBy: disbursement.createdBy.role
     })
 
     return NextResponse.json(updatedDisbursement, { status: 200 })

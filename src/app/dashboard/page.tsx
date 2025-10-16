@@ -15,9 +15,7 @@ import {
   CheckCircle,
   XCircle,
   DollarSign,
-  TrendingUp,
-  Users,
-  Calendar
+  TrendingUp
 } from "lucide-react"
 
 interface DashboardStats {
@@ -31,7 +29,8 @@ interface DashboardStats {
 
 interface RecentVoucher {
   id: string
-  title: string
+  payee: string
+  particulars: string
   amount: number
   status: string
   createdAt: string
@@ -243,30 +242,28 @@ export default function DashboardPage() {
                     className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
                   >
                     <div className="flex-1">
-                      <div className="flex items-center space-x-3">
+                      <div className="flex items-start space-x-3">
                         <div className="flex-shrink-0">
                           <FileText className="h-5 w-5 text-gray-400" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">
-                            {voucher.title}
-                          </p>
-                          <div className="flex items-center space-x-2 mt-1">
-                            <p className="text-sm text-gray-500">
-                              {voucher.createdBy.name}
-                            </p>
-                            {voucher.createdBy.department && (
-                              <>
-                                <span className="text-gray-300">•</span>
-                                <p className="text-sm text-gray-500">
-                                  {voucher.createdBy.department}
-                                </p>
-                              </>
-                            )}
-                            <span className="text-gray-300">•</span>
-                            <p className="text-sm text-gray-500">
-                              {formatDate(voucher.createdAt)}
-                            </p>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">
+                                <span className="text-gray-600">Payee:</span> {voucher.payee}
+                              </p>
+                              <p className="text-sm text-gray-600 mt-1">
+                                <span className="text-gray-500">Department:</span> {voucher.createdBy.department || "N/A"}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-sm text-gray-600">
+                                <span className="text-gray-500">Particulars:</span> {voucher.particulars}
+                              </p>
+                              <p className="text-sm text-gray-500 mt-1">
+                                <span className="text-gray-400">Created by:</span> {voucher.createdBy.name} • {formatDate(voucher.createdAt)}
+                              </p>
+                            </div>
                           </div>
                         </div>
                       </div>
