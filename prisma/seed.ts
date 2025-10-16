@@ -101,7 +101,6 @@ async function main() {
 
   // Find specific users for creating sample data
   const requester = createdUsers.find(u => u.role === 'REQUESTER')
-  const admin = createdUsers.find(u => u.role === 'ADMIN')
 
   if (requester) {
     console.log('📄 Creating sample disbursement vouchers...')
@@ -213,7 +212,14 @@ async function main() {
       const { items, ...voucherInfo } = voucherData
       const voucher = await prisma.disbursementVoucher.create({
         data: {
-          ...voucherInfo,
+          payee: voucherInfo.payee,
+          address: voucherInfo.address,
+          amount: voucherInfo.amount,
+          particulars: voucherInfo.particulars,
+          tags: voucherInfo.tags,
+          sourceOffice: voucherInfo.sourceOffice,
+          status: voucherInfo.status,
+          createdById: voucherInfo.createdById,
           items: {
             create: items
           }
