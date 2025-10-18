@@ -14,7 +14,7 @@ import {
   Clock,
   CheckCircle,
   XCircle,
-  DollarSign,
+  Banknote,
   TrendingUp
 } from "lucide-react"
 
@@ -128,7 +128,7 @@ export default function DashboardPage() {
     {
       title: "Total Amount",
       value: formatCurrency(stats?.totalAmount || 0),
-      icon: DollarSign,
+      icon: Banknote,
       color: "text-emerald-600",
       bgColor: "bg-emerald-50"
     },

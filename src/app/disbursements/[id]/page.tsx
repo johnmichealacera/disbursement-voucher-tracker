@@ -43,7 +43,7 @@ import {
   FileText, 
   User, 
   Calendar, 
-  DollarSign,
+  Banknote,
   Package,
   Clock,
   CheckCircle,
@@ -1920,7 +1920,7 @@ export default function DisbursementDetailPage() {
           <DialogContent>
             <DialogHeader>
               <DialogTitle className="flex items-center">
-                <DollarSign className="mr-2 h-5 w-5" />
+                <Banknote className="mr-2 h-5 w-5" />
                 Confirm Treasury Action
               </DialogTitle>
               <DialogDescription>
@@ -1986,7 +1986,7 @@ export default function DisbursementDetailPage() {
                   </>
                 ) : (
                   <>
-                    <DollarSign className="mr-2 h-4 w-4" />
+                    <Banknote className="mr-2 h-4 w-4" />
                     Confirm {treasuryAction === "CHECK_ISSUANCE" ? "Check Issuance" : "Release"}
                   </>
                 )}
