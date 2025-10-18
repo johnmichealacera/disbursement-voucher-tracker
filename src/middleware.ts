@@ -33,8 +33,8 @@ export default withAuth(
         return NextResponse.redirect(new URL("/dashboard", req.url))
       }
 
-      // Create route - only for requesters, admins, GSO, and HR
-      if (pathname.startsWith("/create") && !["REQUESTER", "ADMIN", "GSO", "HR"].includes(userRole)) {
+      // Create route - available for all roles
+      if (pathname.startsWith("/create") && !["REQUESTER", "ACCOUNTING", "BUDGET", "TREASURY", "MAYOR", "ADMIN", "DEPARTMENT_HEAD", "FINANCE_HEAD", "GSO", "HR", "BAC"].includes(userRole)) {
         return NextResponse.redirect(new URL("/dashboard", req.url))
       }
     }

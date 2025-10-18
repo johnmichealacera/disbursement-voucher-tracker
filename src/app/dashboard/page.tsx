@@ -6,7 +6,7 @@ import { useSession } from "next-auth/react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { formatCurrency, formatDate, getStatusColor } from "@/lib/utils"
+import { formatCurrency, formatDate, getStatusColor, getCurrentReviewer } from "@/lib/utils"
 import { MainLayout } from "@/components/layout/main-layout"
 import Link from "next/link"
 import {
@@ -37,7 +37,28 @@ interface RecentVoucher {
   createdBy: {
     name: string
     department?: string
+    role: string
   }
+  approvals: Array<{
+    level: number
+    status: string
+    approver: {
+      name: string
+      role: string
+    }
+  }>
+  bacReviews?: Array<{
+    reviewer: {
+      name: string
+      role: string
+    }
+  }>
+  auditTrails: Array<{
+    action: string
+    user: {
+      role: string
+    }
+  }>
 }
 
 export default function DashboardPage() {
@@ -265,6 +286,21 @@ export default function DashboardPage() {
                               </p>
                             </div>
                           </div>
+                          {/* Current Reviewer Information */}
+                          {(() => {
+                            const currentReviewer = getCurrentReviewer(voucher)
+                            return currentReviewer ? (
+                              <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                <div className="flex items-center space-x-2">
+                                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                                  <span className="text-sm font-medium text-blue-800">Current Reviewer:</span>
+                                </div>
+                                <p className="text-sm text-blue-700 mt-1">
+                                  <span className="font-medium">{currentReviewer.displayName}</span> - {currentReviewer.status}
+                                </p>
+                              </div>
+                            ) : null
+                          })()}
                         </div>
                       </div>
                     </div>

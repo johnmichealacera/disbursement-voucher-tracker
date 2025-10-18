@@ -33,7 +33,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { formatCurrency, formatDate, formatDateTime, getStatusColor } from "@/lib/utils"
+import { formatCurrency, formatDate, formatDateTime, getStatusColor, getCurrentReviewer } from "@/lib/utils"
 import { ProgressBar } from "@/components/ui/progress-bar"
 import { calculateProgress } from "@/lib/progress-utils"
 import { 
@@ -315,8 +315,10 @@ export default function DisbursementDetailPage() {
       })
 
       if (response.ok) {
-        const updatedDisbursement = await response.json()
-        setDisbursement(updatedDisbursement)
+        const responseData = await response.json()
+        console.log("Approval response data:", responseData)
+        console.log("Disbursement data:", responseData.disbursement)
+        setDisbursement(responseData.disbursement)
         setShowReviewDialog(false)
         setReviewPassword("")
       } else {
@@ -460,8 +462,10 @@ export default function DisbursementDetailPage() {
       })
 
       if (response.ok) {
-        const updatedDisbursement = await response.json()
-        setDisbursement(updatedDisbursement)
+        const responseData = await response.json()
+        console.log("Budget review response data:", responseData)
+        console.log("Budget review disbursement data:", responseData.disbursement)
+        setDisbursement(responseData.disbursement)
         setShowReviewDialog(false)
         setReviewPassword("")
       } else {
@@ -517,8 +521,10 @@ export default function DisbursementDetailPage() {
       })
 
       if (response.ok) {
-        const updatedDisbursement = await response.json()
-        setDisbursement(updatedDisbursement)
+        const responseData = await response.json()
+        console.log("Accounting review response data:", responseData)
+        console.log("Accounting review disbursement data:", responseData.disbursement)
+        setDisbursement(responseData.disbursement)
         setShowReviewDialog(false)
         setReviewPassword("")
       } else {
@@ -1074,6 +1080,18 @@ export default function DisbursementDetailPage() {
             <Badge className={getStatusColor(disbursement?.status)}>
               {disbursement?.status}
             </Badge>
+            {/* Current Reviewer Information */}
+            {(() => {
+              const currentReviewer = getCurrentReviewer(disbursement)
+              return currentReviewer ? (
+                <div className="flex items-center space-x-2 px-3 py-1 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                  <span className="text-sm font-medium text-blue-800">Current Reviewer:</span>
+                  <span className="text-sm text-blue-700">{currentReviewer.displayName}</span>
+                  <span className="text-xs text-blue-600">({currentReviewer.status})</span>
+                </div>
+              ) : null
+            })()}
             {canSubmit && (
               <Button 
                 onClick={handleSubmitForReview}
@@ -1671,18 +1689,25 @@ export default function DisbursementDetailPage() {
                 <label className="text-sm font-medium text-gray-700 mb-2 block">
                   Target Offices *
                 </label>
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <div className="flex gap-2">
                     <Select onValueChange={addOffice}>
-                      <SelectTrigger className="flex-1">
+                      <SelectTrigger className="flex-1 border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 bg-white shadow-sm">
                         <SelectValue placeholder="Select an office to notify" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-md max-h-60 overflow-y-auto">
                         {availableOffices
                           .filter(office => !selectedOffices.includes(office))
                           .map((office) => (
-                            <SelectItem key={office} value={office}>
-                              {office}
+                            <SelectItem 
+                              key={office} 
+                              value={office}
+                              className="hover:bg-blue-50 focus:bg-blue-50 cursor-pointer py-2 px-3"
+                            >
+                              <div className="flex items-center space-x-2">
+                                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                <span className="text-gray-700">{office}</span>
+                              </div>
                             </SelectItem>
                           ))}
                       </SelectContent>
@@ -1690,23 +1715,31 @@ export default function DisbursementDetailPage() {
                   </div>
                   
                   {selectedOffices.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {selectedOffices.map((office, index) => (
-                        <div key={index} className="flex items-center gap-1 bg-blue-100 text-blue-800 px-3 py-1 rounded-md text-sm">
-                          {office}
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="h-4 w-4 p-0 hover:bg-blue-200"
-                            onClick={() => removeOffice(office)}
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      ))}
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-gray-600">Selected Offices:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedOffices.map((office, index) => (
+                          <div key={index} className="flex items-center gap-2 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 text-blue-800 px-3 py-2 rounded-lg text-sm font-medium shadow-sm hover:shadow-md transition-shadow">
+                            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                            <span>{office}</span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-5 w-5 p-0 hover:bg-blue-200 rounded-full"
+                              onClick={() => removeOffice(office)}
+                            >
+                              <X className="h-3 w-3 text-blue-600" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
+                  
+                  <p className="text-xs text-gray-500">
+                    Select offices that will receive notifications about this disbursement
+                  </p>
                 </div>
               </div>
             </div>

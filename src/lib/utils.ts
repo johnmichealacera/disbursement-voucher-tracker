@@ -89,3 +89,185 @@ export function getRoleDisplayName(role: string): string {
       return role
   }
 }
+
+export function getCurrentReviewer(disbursement: any): { role: string; displayName: string; status: string } | null {
+  if (!disbursement || !disbursement.approvals) {
+    return null
+  }
+
+  const { createdBy, approvals, bacReviews, status, auditTrails } = disbursement
+
+  // If voucher is rejected or released, no current reviewer
+  if (status === 'REJECTED' || status === 'RELEASED') {
+    return null
+  }
+
+  // If still in draft, creator is the current reviewer
+  if (status === 'DRAFT') {
+    return {
+      role: createdBy.role,
+      displayName: getRoleDisplayName(createdBy.role),
+      status: 'Draft'
+    }
+  }
+
+  // For GSO workflow
+  if (createdBy.role === 'GSO') {
+    // Check if Mayor has reviewed
+    const mayorApproved = approvals.some((approval: any) => 
+      approval.level === 1 && approval.status === 'APPROVED'
+    )
+    
+    if (!mayorApproved) {
+      return {
+        role: 'MAYOR',
+        displayName: 'Mayor',
+        status: 'Awaiting Mayor Review'
+      }
+    }
+
+    // Check BAC reviews
+    const bacReviewCount = bacReviews ? bacReviews.length : 0
+    if (bacReviewCount < 3) {
+      return {
+        role: 'BAC',
+        displayName: 'BAC Committee',
+        status: `Awaiting BAC Review (${bacReviewCount}/3)`
+      }
+    }
+
+    // Check Budget approval
+    const budgetApproved = approvals.some((approval: any) => 
+      approval.level === 3 && approval.status === 'APPROVED'
+    )
+    
+    if (!budgetApproved) {
+      return {
+        role: 'BUDGET',
+        displayName: 'Budget Officer',
+        status: 'Awaiting Budget Review'
+      }
+    }
+
+    // Check Accounting approval
+    const accountingApproved = approvals.some((approval: any) => 
+      approval.level === 4 && approval.status === 'APPROVED'
+    )
+    
+    if (!accountingApproved) {
+      return {
+        role: 'ACCOUNTING',
+        displayName: 'Accounting Officer',
+        status: 'Awaiting Accounting Review'
+      }
+    }
+
+    // Check Treasury actions (only if auditTrails is available)
+    if (auditTrails && auditTrails.length > 0) {
+      const hasCheckIssuance = auditTrails.some((trail: any) => 
+        trail.action === 'CHECK_ISSUANCE' && trail.user.role === 'TREASURY'
+      )
+      const hasMarkReleased = auditTrails.some((trail: any) => 
+        trail.action === 'MARK_RELEASED' && trail.user.role === 'TREASURY'
+      )
+
+      if (!hasCheckIssuance) {
+        return {
+          role: 'TREASURY',
+          displayName: 'Treasury Officer',
+          status: 'Awaiting Check Issuance'
+        }
+      }
+
+      if (!hasMarkReleased) {
+        return {
+          role: 'TREASURY',
+          displayName: 'Treasury Officer',
+          status: 'Awaiting Release'
+        }
+      }
+    } else {
+      // If no audit trails, assume Treasury needs to act
+      return {
+        role: 'TREASURY',
+        displayName: 'Treasury Officer',
+        status: 'Awaiting Treasury Action'
+      }
+    }
+  }
+
+  // For Standard workflow (non-GSO)
+  // Check Mayor approval
+  const mayorApproved = approvals.some((approval: any) => 
+    approval.level === 1 && approval.status === 'APPROVED'
+  )
+  
+  if (!mayorApproved) {
+    return {
+      role: 'MAYOR',
+      displayName: 'Mayor',
+      status: 'Awaiting Mayor Review'
+    }
+  }
+
+  // Check Budget approval
+  const budgetApproved = approvals.some((approval: any) => 
+    approval.level === 2 && approval.status === 'APPROVED'
+  )
+  
+  if (!budgetApproved) {
+    return {
+      role: 'BUDGET',
+      displayName: 'Budget Officer',
+      status: 'Awaiting Budget Review'
+    }
+  }
+
+  // Check Accounting approval
+  const accountingApproved = approvals.some((approval: any) => 
+    approval.level === 3 && approval.status === 'APPROVED'
+  )
+  
+  if (!accountingApproved) {
+    return {
+      role: 'ACCOUNTING',
+      displayName: 'Accounting Officer',
+      status: 'Awaiting Accounting Review'
+    }
+  }
+
+  // Check Treasury actions (only if auditTrails is available)
+  if (auditTrails && auditTrails.length > 0) {
+    const hasCheckIssuance = auditTrails.some((trail: any) => 
+      trail.action === 'CHECK_ISSUANCE' && trail.user.role === 'TREASURY'
+    )
+    const hasMarkReleased = auditTrails.some((trail: any) => 
+      trail.action === 'MARK_RELEASED' && trail.user.role === 'TREASURY'
+    )
+
+    if (!hasCheckIssuance) {
+      return {
+        role: 'TREASURY',
+        displayName: 'Treasury Officer',
+        status: 'Awaiting Check Issuance'
+      }
+    }
+
+    if (!hasMarkReleased) {
+      return {
+        role: 'TREASURY',
+        displayName: 'Treasury Officer',
+        status: 'Awaiting Release'
+      }
+    }
+  } else {
+    // If no audit trails, assume Treasury needs to act
+    return {
+      role: 'TREASURY',
+      displayName: 'Treasury Officer',
+      status: 'Awaiting Treasury Action'
+    }
+  }
+
+  return null
+}

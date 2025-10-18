@@ -24,7 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { formatCurrency, formatDate, getStatusColor } from "@/lib/utils"
+import { formatCurrency, formatDate, getStatusColor, getCurrentReviewer } from "@/lib/utils"
 import { FileText, Plus, Search, Filter, Eye } from "lucide-react"
 
 interface Disbursement {
@@ -37,10 +37,31 @@ interface Disbursement {
   createdBy: {
     name: string
     department?: string
+    role: string
   }
   assignedTo?: {
     name: string
   }
+  approvals: Array<{
+    level: number
+    status: string
+    approver: {
+      name: string
+      role: string
+    }
+  }>
+  bacReviews?: Array<{
+    reviewer: {
+      name: string
+      role: string
+    }
+  }>
+  auditTrails: Array<{
+    action: string
+    user: {
+      role: string
+    }
+  }>
 }
 
 interface PaginationInfo {
@@ -216,6 +237,7 @@ function DisbursementsContent() {
                     <TableHead>Department</TableHead>
                     <TableHead>Amount</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Current Reviewer</TableHead>
                     <TableHead>Requester</TableHead>
                     <TableHead>Created</TableHead>
                     <TableHead>Actions</TableHead>
@@ -246,6 +268,22 @@ function DisbursementsContent() {
                         <Badge className={getStatusColor(disbursement.status)}>
                           {disbursement.status}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {(() => {
+                          const currentReviewer = getCurrentReviewer(disbursement)
+                          return currentReviewer ? (
+                            <div className="flex items-center space-x-2">
+                              <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                              <div className="text-sm">
+                                <div className="font-medium text-blue-800">{currentReviewer.displayName}</div>
+                                <div className="text-xs text-blue-600">{currentReviewer.status}</div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-sm text-gray-500">Completed</div>
+                          )
+                        })()}
                       </TableCell>
                       <TableCell>
                         <div className="text-sm">{disbursement.createdBy.name}</div>

@@ -250,7 +250,7 @@ export default function CreateVoucherPage() {
     return null
   }
 
-  if (!["REQUESTER", "ADMIN", "GSO", "HR"].includes(session.user.role)) {
+  if (!["REQUESTER", "ACCOUNTING", "BUDGET", "TREASURY", "MAYOR", "ADMIN", "DEPARTMENT_HEAD", "FINANCE_HEAD", "GSO", "HR", "BAC"].includes(session.user.role)) {
     return (
       <MainLayout>
         <div className="p-6">
@@ -376,17 +376,26 @@ export default function CreateVoucherPage() {
                 {/* Source Office - Only for GSO users */}
                 {isGSOUser && (
                   <div>
-                    <FormLabel>Source Office</FormLabel>
-                    <div className="space-y-2">
+                    <FormLabel className="text-sm font-medium text-gray-700 mb-2 block">
+                      Source Office
+                    </FormLabel>
+                    <div className="space-y-3">
                       <div className="flex gap-2">
                         <Select value={selectedOffice} onValueChange={setSelectedOffice}>
-                          <SelectTrigger className="flex-1">
-                            <SelectValue placeholder="Select an office" />
+                          <SelectTrigger className="flex-1 border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 bg-white shadow-sm">
+                            <SelectValue placeholder="Select an office to add" />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-md max-h-60 overflow-y-auto">
                             {offices.map((office) => (
-                              <SelectItem key={office} value={office}>
-                                {office}
+                              <SelectItem 
+                                key={office} 
+                                value={office}
+                                className="hover:bg-blue-50 focus:bg-blue-50 cursor-pointer py-2 px-3"
+                              >
+                                <div className="flex items-center space-x-2">
+                                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                  <span className="text-gray-700">{office}</span>
+                                </div>
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -397,26 +406,40 @@ export default function CreateVoucherPage() {
                           variant="outline" 
                           size="sm"
                           disabled={!selectedOffice}
+                          className="bg-blue-600 hover:bg-blue-700 text-white border-blue-600 hover:border-blue-700 disabled:bg-gray-300 disabled:border-gray-300 disabled:text-gray-500"
                         >
                           <Plus className="h-4 w-4" />
                         </Button>
                       </div>
-                      <div className="flex flex-wrap gap-2">
-                        {(form.watch("sourceOffice" as any) || []).map((office: string, index: number) => (
-                          <div key={index} className="flex items-center gap-1 bg-green-100 text-green-800 px-2 py-1 rounded-md text-sm">
-                            {office}
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="h-4 w-4 p-0 hover:bg-green-200"
-                              onClick={() => removeSourceOffice(office)}
-                            >
-                              <X className="h-3 w-3" />
-                            </Button>
+                      
+                      {/* Selected Offices Display */}
+                      {(form.watch("sourceOffice" as any) || []).length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-sm font-medium text-gray-600">Selected Offices:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {(form.watch("sourceOffice" as any) || []).map((office: string, index: number) => (
+                              <div key={index} className="flex items-center gap-2 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 text-green-800 px-3 py-2 rounded-lg text-sm font-medium shadow-sm hover:shadow-md transition-shadow">
+                                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                <span>{office}</span>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-5 w-5 p-0 hover:bg-green-200 rounded-full"
+                                  onClick={() => removeSourceOffice(office)}
+                                >
+                                  <X className="h-3 w-3 text-green-600" />
+                                </Button>
+                              </div>
+                            ))}
                           </div>
-                        ))}
-                      </div>
+                        </div>
+                      )}
+                      
+                      {/* Help Text */}
+                      <p className="text-xs text-gray-500">
+                        Select offices that will be notified about this disbursement request
+                      </p>
                     </div>
                   </div>
                 )}

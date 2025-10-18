@@ -163,6 +163,25 @@ export async function POST(
             role: true,
           }
         },
+        assignedTo: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true
+          }
+        },
+        items: true,
+        attachments: {
+          include: {
+            uploadedBy: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
+          }
+        },
         approvals: {
           include: {
             approver: {
@@ -174,6 +193,34 @@ export async function POST(
             }
           },
           orderBy: { level: "asc" }
+        },
+        bacReviews: {
+          include: {
+            reviewer: {
+              select: {
+                id: true,
+                name: true,
+                role: true
+              }
+            }
+          },
+          orderBy: {
+            createdAt: "desc"
+          }
+        },
+        auditTrails: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                role: true
+              }
+            }
+          },
+          orderBy: {
+            timestamp: "desc"
+          }
         }
       }
     })

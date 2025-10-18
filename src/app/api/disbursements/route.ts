@@ -113,7 +113,8 @@ export async function GET(request: NextRequest) {
               id: true,
               name: true,
               email: true,
-              department: true
+              department: true,
+              role: true
             }
           },
           assignedTo: {
@@ -128,6 +129,28 @@ export async function GET(request: NextRequest) {
           approvals: {
             include: {
               approver: {
+                select: {
+                  id: true,
+                  name: true,
+                  role: true
+                }
+              }
+            }
+          },
+          bacReviews: {
+            include: {
+              reviewer: {
+                select: {
+                  id: true,
+                  name: true,
+                  role: true
+                }
+              }
+            }
+          },
+          auditTrails: {
+            include: {
+              user: {
                 select: {
                   id: true,
                   name: true,
