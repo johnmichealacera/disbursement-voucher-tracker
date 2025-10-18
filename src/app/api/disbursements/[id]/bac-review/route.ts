@@ -36,6 +36,14 @@ export async function POST(
       include: {
         createdBy: { select: { id: true, name: true, role: true, department: true } },
         items: true,
+        approvals: { 
+          include: { approver: { select: { id: true, name: true, role: true } } }, 
+          orderBy: { level: "asc" } 
+        },
+        bacReviews: {
+          include: { reviewer: { select: { id: true, name: true, role: true } } },
+          orderBy: { createdAt: "desc" }
+        },
         auditTrails: {
           include: { user: { select: { name: true, role: true } } },
           orderBy: { timestamp: "desc" }
@@ -62,16 +70,63 @@ export async function POST(
       }, { status: 400 })
     }
 
-    // Check if Mayor has already reviewed this voucher
-    const mayorHasReviewed = disbursement.auditTrails.some(trail => 
+    // Check if Mayor has already reviewed this voucher (using approval levels OR audit trails)
+    const mayorHasReviewedByApproval = disbursement.approvals && disbursement.approvals.some(approval => 
+      approval.level === 1 && approval.status === "APPROVED"
+    )
+    
+    const mayorHasReviewedByAudit = disbursement.auditTrails && disbursement.auditTrails.some(trail => 
       trail.action === "REVIEW" && trail.user.role === "MAYOR"
     )
+    
+    const mayorHasReviewed = mayorHasReviewedByApproval || mayorHasReviewedByAudit
+
+    // Debug logging
+    console.log("BAC Review Debug:", {
+      disbursementId: disbursement.id,
+      disbursementStatus: disbursement.status,
+      disbursementRole: disbursement.createdBy.role,
+      approvals: disbursement.approvals,
+      auditTrails: disbursement.auditTrails,
+      mayorHasReviewedByApproval,
+      mayorHasReviewedByAudit,
+      mayorHasReviewed,
+      bacReviews: disbursement.bacReviews,
+      approvalLevel1: disbursement.approvals?.filter(a => a.level === 1),
+      approvalLevel2: disbursement.approvals?.filter(a => a.level === 2)
+    })
 
     if (!mayorHasReviewed) {
       return NextResponse.json({ 
         error: "BAC can only review GSO vouchers after Mayor has reviewed them" 
       }, { status: 400 })
     }
+
+    // Check if this BAC member has already reviewed this voucher
+    const existingReview = disbursement.bacReviews.find(review => 
+      review.reviewerId === session.user.id
+    )
+
+    if (existingReview) {
+      return NextResponse.json({ 
+        error: "You have already reviewed this disbursement voucher" 
+      }, { status: 400 })
+    }
+
+    // Create BAC review record
+    await prisma.bacReview.create({
+      data: {
+        status: "APPROVED", // BAC reviews are always approvals
+        comments: validatedData.comments,
+        reviewerId: session.user.id,
+        disbursementVoucherId: disbursement.id,
+        reviewedAt: new Date()
+      }
+    })
+
+    // Count total BAC reviews for this disbursement
+    const totalBacReviews = disbursement.bacReviews.length + 1 // +1 for the one we just created
+    const requiredReviews = 3
 
     // Create audit trail for the BAC review
     await prisma.auditTrail.create({
@@ -83,12 +138,32 @@ export async function POST(
         newValues: { 
           status: disbursement.status, // Status doesn't change, just reviewed
           bacReviewedBy: session.user.name,
-          bacReviewComments: validatedData.comments 
+          bacReviewComments: validatedData.comments,
+          bacReviewCount: totalBacReviews,
+          bacReviewRequired: requiredReviews
         },
         userId: session.user.id,
         disbursementVoucherId: disbursement.id
       }
     })
+
+    // Check if we have reached the required number of BAC reviews (3 out of 5)
+    if (totalBacReviews >= requiredReviews) {
+      // BAC review is complete - no need to create approval level
+      // Budget will create its own approval when it reviews
+
+      // Send notification that BAC review is complete
+      await sendWorkflowNotifications({
+        disbursementId: disbursement.id,
+        payee: disbursement.payee,
+        amount: Number(disbursement.amount),
+        action: "BAC_REVIEW_COMPLETE",
+        performedBy: `${totalBacReviews} BAC Members`,
+        performedByRole: "BAC",
+        disbursementCreatedBy: disbursement.createdBy.role,
+        remarks: `BAC review completed by ${totalBacReviews} out of 5 members`
+      })
+    }
 
     // Send workflow notifications
     await sendWorkflowNotifications({
@@ -111,6 +186,10 @@ export async function POST(
         approvals: { 
           include: { approver: { select: { id: true, name: true, role: true } } }, 
           orderBy: { level: "asc" } 
+        },
+        bacReviews: {
+          include: { reviewer: { select: { id: true, name: true, role: true } } },
+          orderBy: { createdAt: "desc" }
         },
         auditTrails: {
           include: { user: { select: { name: true, role: true } } },

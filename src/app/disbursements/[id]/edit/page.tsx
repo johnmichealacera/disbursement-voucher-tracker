@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from "react"
 import { useSession } from "next-auth/react"
-import { useRouter } from "next/navigation"
+import { useRouter, useParams } from "next/navigation"
 import { useForm, useFieldArray } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -29,10 +29,10 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { formatCurrency } from "@/lib/utils"
-import { Plus, Trash2, Save, Send, X } from "lucide-react"
+import { Plus, Trash2, Save, Send, X, ArrowLeft } from "lucide-react"
 
 // Create conditional schemas based on user role
-const createGSOVoucherSchema = z.object({
+const editGSOVoucherSchema = z.object({
   payee: z.string().min(1, "Payee is required"),
   address: z.string().min(1, "Address is required"),
   particulars: z.string().min(1, "Particulars is required"),
@@ -48,7 +48,7 @@ const createGSOVoucherSchema = z.object({
   })).min(1, "At least one item is required")
 })
 
-const createNonGSOVoucherSchema = z.object({
+const editNonGSOVoucherSchema = z.object({
   payee: z.string().min(1, "Payee is required"),
   address: z.string().min(1, "Address is required"),
   particulars: z.string().min(1, "Particulars is required"),
@@ -56,15 +56,47 @@ const createNonGSOVoucherSchema = z.object({
   remarks: z.string().optional()
 })
 
-type GSOFormData = z.infer<typeof createGSOVoucherSchema>
-type NonGSOFormData = z.infer<typeof createNonGSOVoucherSchema>
+type GSOFormData = z.infer<typeof editGSOVoucherSchema>
+type NonGSOFormData = z.infer<typeof editNonGSOVoucherSchema>
 type FormData = GSOFormData | NonGSOFormData
 
-export default function CreateVoucherPage() {
+interface DisbursementItem {
+  id: string
+  description: string
+  quantity: number
+  unit: string
+  unitPrice: number
+  totalPrice: number
+}
+
+interface Disbursement {
+  id: string
+  payee: string
+  address: string
+  amount: number
+  particulars: string
+  tags: string[]
+  sourceOffice: string[]
+  remarks?: string
+  status: string
+  createdBy: {
+    id: string
+    name: string
+    role: string
+  }
+  items: DisbursementItem[]
+}
+
+export default function EditDisbursementPage() {
   const { data: session } = useSession()
   const router = useRouter()
+  const params = useParams()
+  const id = params.id as string
+
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState("")
+  const [loading, setLoading] = useState(true)
+  const [disbursement, setDisbursement] = useState<Disbursement | null>(null)
   const [tagInput, setTagInput] = useState("")
   const [offices, setOffices] = useState<string[]>([])
   const [selectedOffice, setSelectedOffice] = useState("")
@@ -73,7 +105,7 @@ export default function CreateVoucherPage() {
   const isGSOUser = session?.user?.role === "GSO"
 
   // Use appropriate schema based on user role
-  const schema = isGSOUser ? createGSOVoucherSchema : createNonGSOVoucherSchema
+  const schema = isGSOUser ? editGSOVoucherSchema : editNonGSOVoucherSchema
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -116,10 +148,10 @@ export default function CreateVoucherPage() {
     : watchedAmount || 0
 
   const calculateItemTotal = (index: number) => {
-    const quantity = form.getValues(`items.${index}.quantity`) || 0
-    const unitPrice = form.getValues(`items.${index}.unitPrice`) || 0
+    const quantity = form.getValues(`items.${index}.quantity` as any) || 0
+    const unitPrice = form.getValues(`items.${index}.unitPrice` as any) || 0
     const total = quantity * unitPrice
-    form.setValue(`items.${index}.totalPrice`, total)
+    form.setValue(`items.${index}.totalPrice` as any, total)
   }
 
   const addItem = () => {
@@ -133,49 +165,90 @@ export default function CreateVoucherPage() {
   }
 
   const removeItem = (index: number) => {
-    if (fields.length > 1) {
-      remove(index)
-    }
+    remove(index)
   }
 
   const addTag = () => {
     if (tagInput.trim()) {
-      const currentTags = form.getValues("tags")
-      if (!currentTags.includes(tagInput.trim())) {
-        form.setValue("tags", [...currentTags, tagInput.trim()])
-      }
+      const currentTags = form.getValues("tags" as any) || []
+      form.setValue("tags" as any, [...currentTags, tagInput.trim()])
       setTagInput("")
     }
   }
 
   const removeTag = (tagToRemove: string) => {
-    const currentTags = form.getValues("tags")
-    form.setValue("tags", currentTags.filter(tag => tag !== tagToRemove))
+    const currentTags = form.getValues("tags" as any) || []
+    form.setValue("tags" as any, currentTags.filter((tag: string) => tag !== tagToRemove))
   }
 
   const addSourceOffice = () => {
     if (selectedOffice) {
-      const currentOffices = form.getValues("sourceOffice")
+      const currentOffices = form.getValues("sourceOffice" as any) || []
       if (!currentOffices.includes(selectedOffice)) {
-        form.setValue("sourceOffice", [...currentOffices, selectedOffice])
+        form.setValue("sourceOffice" as any, [...currentOffices, selectedOffice])
       }
       setSelectedOffice("")
     }
   }
 
   const removeSourceOffice = (officeToRemove: string) => {
-    const currentOffices = form.getValues("sourceOffice")
-    form.setValue("sourceOffice", currentOffices.filter(office => office !== officeToRemove))
+    const currentOffices = form.getValues("sourceOffice" as any) || []
+    form.setValue("sourceOffice" as any, currentOffices.filter((office: string) => office !== officeToRemove))
   }
 
-  // Fetch offices on component mount
+  const fetchDisbursement = async () => {
+    try {
+      const response = await fetch(`/api/disbursements/${id}`)
+      if (response.ok) {
+        const data = await response.json()
+        setDisbursement(data)
+        
+        // Populate form with existing data
+        if (isGSOUser) {
+          form.reset({
+            payee: data.payee,
+            address: data.address,
+            particulars: data.particulars,
+            tags: data.tags || [],
+            sourceOffice: data.sourceOffice || [],
+            remarks: data.remarks || "",
+            items: data.items && data.items.length > 0 ? data.items : [
+              {
+                description: "",
+                quantity: 1,
+                unit: "",
+                unitPrice: 0,
+                totalPrice: 0
+              }
+            ]
+          })
+        } else {
+          form.reset({
+            payee: data.payee,
+            address: data.address,
+            particulars: data.particulars,
+            amount: Number(data.amount),
+            remarks: data.remarks || ""
+          })
+        }
+      } else {
+        const errorData = await response.json()
+        setError(errorData.error || "Failed to fetch disbursement")
+      }
+    } catch (error) {
+      setError("An error occurred while fetching the disbursement")
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
     const fetchOffices = async () => {
       try {
         const response = await fetch("/api/departments")
         if (response.ok) {
           const data = await response.json()
-          setOffices(data)
+          setOffices(data.departments)
         }
       } catch (error) {
         console.error("Error fetching offices:", error)
@@ -183,9 +256,10 @@ export default function CreateVoucherPage() {
     }
 
     fetchOffices()
+    fetchDisbursement()
   }, [])
 
-  const onSubmit = async (data: FormData, isDraft = false) => {
+  const onSubmit = async (data: FormData) => {
     setIsSubmitting(true)
     setError("")
 
@@ -194,53 +268,32 @@ export default function CreateVoucherPage() {
       const submitData = isGSOUser 
         ? {
             ...data as GSOFormData,
-            amount: totalAmount,
-            status: "DRAFT"
+            amount: totalAmount
           }
         : {
             ...data as NonGSOFormData,
             tags: [],
             sourceOffice: [],
-            items: [],
-            status: "DRAFT"
+            items: []
           }
 
-      // First, create the disbursement as DRAFT
-      const createResponse = await fetch("/api/disbursements", {
-        method: "POST",
+      const response = await fetch(`/api/disbursements/${id}`, {
+        method: "PATCH",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(submitData),
       })
 
-      if (!createResponse.ok) {
-        const errorData = await createResponse.json()
-        setError(errorData.error || "Failed to create voucher")
+      if (!response.ok) {
+        const errorData = await response.json()
+        setError(errorData.error || "Failed to update voucher")
         return
       }
 
-      const result = await createResponse.json()
-
-      // If not saving as draft, submit for review
-      if (!isDraft) {
-        const submitResponse = await fetch(`/api/disbursements/${result.id}/submit`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        })
-
-        if (!submitResponse.ok) {
-          const errorData = await submitResponse.json()
-          setError(errorData.error || "Failed to submit voucher for review")
-          return
-        }
-      }
-
-      router.push(`/disbursements/${result.id}`)
+      router.push(`/disbursements/${id}`)
     } catch {
-      setError("An error occurred while processing the voucher")
+      setError("An error occurred while updating the voucher")
     } finally {
       setIsSubmitting(false)
     }
@@ -250,13 +303,39 @@ export default function CreateVoucherPage() {
     return null
   }
 
-  if (!["REQUESTER", "ADMIN", "GSO", "HR"].includes(session.user.role)) {
+  if (loading) {
     return (
       <MainLayout>
         <div className="p-6">
-          <Alert>
+          <div className="text-center py-8 text-gray-500">
+            Loading disbursement...
+          </div>
+        </div>
+      </MainLayout>
+    )
+  }
+
+  if (!disbursement) {
+    return (
+      <MainLayout>
+        <div className="p-6">
+          <Alert variant="destructive">
             <AlertDescription>
-              You don&apos;t have permission to create disbursement vouchers.
+              Disbursement not found or you don&apos;t have permission to edit it.
+            </AlertDescription>
+          </Alert>
+        </div>
+      </MainLayout>
+    )
+  }
+
+  if (disbursement.status !== "DRAFT") {
+    return (
+      <MainLayout>
+        <div className="p-6">
+          <Alert variant="destructive">
+            <AlertDescription>
+              Only draft disbursements can be edited.
             </AlertDescription>
           </Alert>
         </div>
@@ -268,15 +347,21 @@ export default function CreateVoucherPage() {
     <MainLayout>
       <div className="p-6 max-w-4xl mx-auto space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Create Disbursement Voucher</h1>
-          <p className="text-gray-600">
-            Fill out the form below to create a new disbursement request
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Edit Disbursement Voucher</h1>
+            <p className="text-gray-600">
+              Update the disbursement request details
+            </p>
+          </div>
+          <Button variant="outline" onClick={() => router.push(`/disbursements/${id}`)}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Voucher
+          </Button>
         </div>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit((data) => onSubmit(data, false))} className="space-y-6">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             {error && (
               <Alert variant="destructive">
                 <AlertDescription>{error}</AlertDescription>
@@ -629,15 +714,23 @@ export default function CreateVoucherPage() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => onSubmit(form.getValues(), true)}
+                onClick={() => router.push(`/disbursements/${id}`)}
                 disabled={isSubmitting}
               >
-                <Save className="mr-2 h-4 w-4" />
-                Save as Draft
+                Cancel
               </Button>
               <Button type="submit" disabled={isSubmitting}>
-                <Send className="mr-2 h-4 w-4" />
-                Submit for Review
+                {isSubmitting ? (
+                  <>
+                    <Save className="mr-2 h-4 w-4 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    Update Voucher
+                  </>
+                )}
               </Button>
             </div>
           </form>

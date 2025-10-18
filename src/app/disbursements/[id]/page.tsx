@@ -54,6 +54,7 @@ import {
   Plus,
   X
 } from "lucide-react"
+import { BacReview } from "@prisma/client"
 
 interface DisbursementItem {
   id: string
@@ -110,6 +111,8 @@ interface Disbursement {
   items: DisbursementItem[]
   approvals: Approval[]
   auditTrails: AuditTrail[]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  bacReviews: any[]
 }
 
 export default function DisbursementDetailPage() {
@@ -138,6 +141,66 @@ export default function DisbursementDetailPage() {
   const [availableOffices, setAvailableOffices] = useState<string[]>([])
   const [isSubmittingRemarks, setIsSubmittingRemarks] = useState(false)
   const [checkNumber, setCheckNumber] = useState("")
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [deletePassword, setDeletePassword] = useState("")
+  const [passwordError, setPasswordError] = useState("")
+  const [reviewPassword, setReviewPassword] = useState("")
+  const [reviewPasswordError, setReviewPasswordError] = useState("")
+  const [treasuryPassword, setTreasuryPassword] = useState("")
+  const [treasuryPasswordError, setTreasuryPasswordError] = useState("")
+  const [showTreasuryDialog, setShowTreasuryDialog] = useState(false)
+  const [treasuryAction, setTreasuryAction] = useState<"CHECK_ISSUANCE" | "MARK_RELEASED" | null>(null)
+
+  const handleEdit = () => {
+    // Navigate to edit page with the disbursement ID
+    router.push(`/disbursements/${id}/edit`)
+  }
+
+  const handleDelete = async () => {
+    if (!deletePassword.trim()) {
+      setPasswordError("Password is required")
+      return
+    }
+
+    setIsDeleting(true)
+    setPasswordError("")
+    
+    try {
+      // First verify password
+      const passwordResponse = await fetch("/api/auth/verify-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ password: deletePassword }),
+      })
+
+      if (!passwordResponse.ok) {
+        const errorData = await passwordResponse.json()
+        setPasswordError(errorData.error || "Invalid password")
+        setIsDeleting(false)
+        return
+      }
+
+      // If password is valid, proceed with deletion
+      const response = await fetch(`/api/disbursements/${id}`, {
+        method: "DELETE",
+      })
+
+      if (response.ok) {
+        // Redirect to disbursements list after successful deletion
+        router.push("/disbursements")
+      } else {
+        const errorData = await response.json()
+        setError(errorData.error || "Failed to delete disbursement")
+      }
+    } catch (error) {
+      setError("An error occurred while deleting the disbursement")
+    } finally {
+      setIsDeleting(false)
+    }
+  }
 
   const fetchDisbursement = async () => {
     try {
@@ -145,24 +208,48 @@ export default function DisbursementDetailPage() {
       if (response.ok) {
         const data = await response.json()
         setDisbursement(data)
+        setLoading(false) // Only set loading to false when we have data
       } else {
         const errorData = await response.json()
         setError(errorData.error || "Failed to fetch disbursement")
+        setLoading(false) // Set loading to false on error
       }
     } catch (error) {
       setError("An error occurred while fetching the disbursement")
-    } finally {
-      setLoading(false)
+      setLoading(false) // Set loading to false on error
     }
   }
 
   const handleSubmitForReview = async () => {
     if (!disbursement) return
 
+    if (!reviewPassword.trim()) {
+      setReviewPasswordError("Password is required")
+      return
+    }
+
     setIsSubmitting(true)
     setError("")
+    setReviewPasswordError("")
 
     try {
+      // First verify password
+      const passwordResponse = await fetch("/api/auth/verify-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ password: reviewPassword }),
+      })
+
+      if (!passwordResponse.ok) {
+        const errorData = await passwordResponse.json()
+        setReviewPasswordError(errorData.error || "Invalid password")
+        setIsSubmitting(false)
+        return
+      }
+
+      // If password is valid, proceed with submission
       const response = await fetch(`/api/disbursements/${id}/submit`, {
         method: "POST",
         headers: {
@@ -173,6 +260,8 @@ export default function DisbursementDetailPage() {
       if (response.ok) {
         const updatedDisbursement = await response.json()
         setDisbursement(updatedDisbursement)
+        setShowReviewDialog(false)
+        setReviewPassword("")
       } else {
         const errorData = await response.json()
         setError(errorData.error || "Failed to submit for review")
@@ -187,10 +276,33 @@ export default function DisbursementDetailPage() {
   const handleApproval = async (status: "APPROVED" | "REJECTED", remarks?: string) => {
     if (!disbursement) return
 
+    if (!reviewPassword.trim()) {
+      setReviewPasswordError("Password is required")
+      return
+    }
+
     setIsApproving(true)
     setError("")
+    setReviewPasswordError("")
 
     try {
+      // First verify password
+      const passwordResponse = await fetch("/api/auth/verify-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ password: reviewPassword }),
+      })
+
+      if (!passwordResponse.ok) {
+        const errorData = await passwordResponse.json()
+        setReviewPasswordError(errorData.error || "Invalid password")
+        setIsApproving(false)
+        return
+      }
+
+      // If password is valid, proceed with approval
       const response = await fetch(`/api/disbursements/${id}/approve`, {
         method: "POST",
         headers: {
@@ -205,12 +317,14 @@ export default function DisbursementDetailPage() {
       if (response.ok) {
         const updatedDisbursement = await response.json()
         setDisbursement(updatedDisbursement)
+        setShowReviewDialog(false)
+        setReviewPassword("")
       } else {
         const errorData = await response.json()
-        setError(errorData.error || `Failed to ${status.toLowerCase()} disbursement`)
+        setError(errorData.error || `Failed to ${status?.toLowerCase()} disbursement`)
       }
     } catch (error) {
-      setError(`An error occurred while ${status.toLowerCase()}ing the disbursement`)
+      setError(`An error occurred while ${status?.toLowerCase()}ing the disbursement`)
     } finally {
       setIsApproving(false)
     }
@@ -251,10 +365,33 @@ export default function DisbursementDetailPage() {
   const handleBacReview = async () => {
     if (!disbursement) return
 
+    if (!reviewPassword.trim()) {
+      setReviewPasswordError("Password is required")
+      return
+    }
+
     setIsApproving(true)
     setError("")
+    setReviewPasswordError("")
 
     try {
+      // First verify password
+      const passwordResponse = await fetch("/api/auth/verify-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ password: reviewPassword }),
+      })
+
+      if (!passwordResponse.ok) {
+        const errorData = await passwordResponse.json()
+        setReviewPasswordError(errorData.error || "Invalid password")
+        setIsApproving(false)
+        return
+      }
+
+      // If password is valid, proceed with BAC review
       const response = await fetch(`/api/disbursements/${id}/bac-review`, {
         method: "POST",
         headers: {
@@ -268,6 +405,8 @@ export default function DisbursementDetailPage() {
       if (response.ok) {
         const updatedDisbursement = await response.json()
         setDisbursement(updatedDisbursement)
+        setShowReviewDialog(false)
+        setReviewPassword("")
       } else {
         const errorData = await response.json()
         setError(errorData.error || "Failed to BAC review voucher")
@@ -283,23 +422,48 @@ export default function DisbursementDetailPage() {
   const handleBudgetReview = async () => {
     if (!disbursement) return
 
+    if (!reviewPassword.trim()) {
+      setReviewPasswordError("Password is required")
+      return
+    }
+
     setIsApproving(true)
     setError("")
+    setReviewPasswordError("")
 
     try {
-      const response = await fetch(`/api/disbursements/${id}/budget-review`, {
+      // First verify password
+      const passwordResponse = await fetch("/api/auth/verify-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ password: reviewPassword }),
+      })
+
+      if (!passwordResponse.ok) {
+        const errorData = await passwordResponse.json()
+        setReviewPasswordError(errorData.error || "Invalid password")
+        setIsApproving(false)
+        return
+      }
+
+      // If password is valid, proceed with Budget review using standard approval API
+      const response = await fetch(`/api/disbursements/${id}/approve`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          action: "BUDGET_REVIEWED"
+          status: "APPROVED"
         }),
       })
 
       if (response.ok) {
         const updatedDisbursement = await response.json()
         setDisbursement(updatedDisbursement)
+        setShowReviewDialog(false)
+        setReviewPassword("")
       } else {
         const errorData = await response.json()
         setError(errorData.error || "Failed to Budget review voucher")
@@ -315,23 +479,48 @@ export default function DisbursementDetailPage() {
   const handleAccountingReview = async () => {
     if (!disbursement) return
 
+    if (!reviewPassword.trim()) {
+      setReviewPasswordError("Password is required")
+      return
+    }
+
     setIsApproving(true)
     setError("")
+    setReviewPasswordError("")
 
     try {
-      const response = await fetch(`/api/disbursements/${id}/accounting-review`, {
+      // First verify password
+      const passwordResponse = await fetch("/api/auth/verify-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ password: reviewPassword }),
+      })
+
+      if (!passwordResponse.ok) {
+        const errorData = await passwordResponse.json()
+        setReviewPasswordError(errorData.error || "Invalid password")
+        setIsApproving(false)
+        return
+      }
+
+      // If password is valid, proceed with Accounting review using standard approval API
+      const response = await fetch(`/api/disbursements/${id}/approve`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          action: "ACCOUNTING_REVIEWED"
+          status: "APPROVED"
         }),
       })
 
       if (response.ok) {
         const updatedDisbursement = await response.json()
         setDisbursement(updatedDisbursement)
+        setShowReviewDialog(false)
+        setReviewPassword("")
       } else {
         const errorData = await response.json()
         setError(errorData.error || "Failed to Accounting review voucher")
@@ -339,6 +528,68 @@ export default function DisbursementDetailPage() {
     } catch (error) {
       console.error("Error Accounting reviewing disbursement:", error)
       setError("Failed to Accounting review voucher")
+    } finally {
+      setIsApproving(false)
+    }
+  }
+
+  const handleTreasuryPasswordVerification = async () => {
+    if (!treasuryPassword.trim()) {
+      setTreasuryPasswordError("Password is required")
+      return
+    }
+
+    if (!treasuryAction) {
+      setTreasuryPasswordError("No action selected")
+      return
+    }
+
+    setIsApproving(true)
+    setTreasuryPasswordError("")
+
+    try {
+      // First verify password
+      const passwordResponse = await fetch("/api/auth/verify-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ password: treasuryPassword }),
+      })
+
+      if (!passwordResponse.ok) {
+        const errorData = await passwordResponse.json()
+        setTreasuryPasswordError(errorData.error || "Invalid password")
+        setIsApproving(false)
+        return
+      }
+
+      // If password is valid, proceed with Treasury action
+      const response = await fetch(`/api/disbursements/${id}/treasury-review`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: treasuryAction,
+          checkNumber: treasuryAction === "CHECK_ISSUANCE" ? checkNumber : undefined
+        }),
+      })
+
+      if (response.ok) {
+        const updatedDisbursement = await response.json()
+        setDisbursement(updatedDisbursement)
+        setCheckNumber("") // Clear check number after successful issuance
+        setShowTreasuryDialog(false)
+        setTreasuryPassword("")
+        setTreasuryAction(null)
+      } else {
+        const errorData = await response.json()
+        setTreasuryPasswordError(errorData.error || "Failed to process Treasury action")
+      }
+    } catch (error) {
+      console.error("Error processing Treasury action:", error)
+      setTreasuryPasswordError("Failed to process Treasury action")
     } finally {
       setIsApproving(false)
     }
@@ -448,6 +699,32 @@ export default function DisbursementDetailPage() {
     }
   }, [id])
 
+  // Helper function to validate that disbursement data is complete
+  const isDisbursementDataComplete = (disbursement: Disbursement) => {
+    if (!disbursement) return false
+    
+    // Check basic required fields
+    if (!disbursement.createdBy || 
+        !disbursement.id || 
+        !disbursement.payee || 
+        !disbursement.status) {
+      return false
+    }
+    
+    // Check required arrays for progress calculation
+    if (!disbursement.approvals || 
+        !disbursement.auditTrails) {
+      return false
+    }
+    
+    // For GSO workflows, bacReviews is required
+    if (disbursement.createdBy.role === "GSO" && !disbursement.bacReviews) {
+      return false
+    }
+    
+    return true
+  }
+
   if (!session) {
     return null
   }
@@ -493,6 +770,26 @@ export default function DisbursementDetailPage() {
     )
   }
 
+  // Validate that we have all required data before rendering
+  // This ensures the progress bar and all workflow logic work correctly
+  if (!isDisbursementDataComplete(disbursement)) {
+    return (
+      <MainLayout>
+        <div className="p-6">
+          <div className="animate-pulse">
+            <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
+            <div className="h-4 bg-gray-200 rounded w-1/2 mb-8"></div>
+            <div className="space-y-4">
+              <div className="h-32 bg-gray-200 rounded"></div>
+              <div className="h-32 bg-gray-200 rounded"></div>
+              <div className="h-32 bg-gray-200 rounded"></div>
+            </div>
+          </div>
+        </div>
+      </MainLayout>
+    )
+  }
+
   const canSubmit = disbursement.status === "DRAFT" && 
     (disbursement.createdBy.id === session.user.id || ["ADMIN", "GSO", "HR"].includes(session.user.role))
 
@@ -519,7 +816,7 @@ export default function DisbursementDetailPage() {
     
     // Find the next level that needs approval
     for (let level = 1; level <= 3; level++) {
-      const hasApprovalAtLevel = disbursement.approvals.some(approval => 
+      const hasApprovalAtLevel = disbursement.approvals && disbursement.approvals.some(approval => 
         approval.level === level && approval.status === "APPROVED"
       )
       if (!hasApprovalAtLevel) {
@@ -534,13 +831,17 @@ export default function DisbursementDetailPage() {
   // Check if user can approve at their level
   const canApprove = effectiveApprovalLevel && 
     ["PENDING", "VALIDATED"].includes(disbursement.status) &&
+    disbursement.approvals && // Add null check
     !disbursement.approvals.some(approval => 
       approval.approver.id === session.user.id && approval.level === effectiveApprovalLevel
-    )
+    ) &&
+    // Exclude roles that have their own specific review buttons
+    !["ACCOUNTING", "BUDGET", "BAC", "MAYOR"].includes(session.user.role)
 
   // Check if previous levels are completed (for levels > 1)
   const previousLevelsCompleted = effectiveApprovalLevel === 1 || 
     (effectiveApprovalLevel && effectiveApprovalLevel > 1 && 
+     disbursement.approvals && // Add null check
      Array.from({ length: effectiveApprovalLevel - 1 }, (_, i) => i + 1)
        .every(level => 
          disbursement.approvals.some(approval => 
@@ -554,137 +855,199 @@ export default function DisbursementDetailPage() {
   // Mayor review logic
   const canMayorReview = session.user.role === "MAYOR" && 
     disbursement && 
-    ["GSO", "HR", "REQUESTER"].includes(disbursement.createdBy.role) &&
-    ["PENDING", "VALIDATED", "APPROVED"].includes(disbursement.status)
-
-  // Check if Mayor has already reviewed this voucher
-  const mayorHasReviewed = disbursement && session.user.role === "MAYOR" &&
-    disbursement.auditTrails.some(trail => 
-      trail.action === "REVIEW" && 
-      trail.userId === session.user.id
+    ["GSO", "HR", "REQUESTER"].includes(disbursement?.createdBy?.role) &&
+    ["PENDING"].includes(disbursement.status) &&
+    disbursement.approvals && // Add null check
+    !disbursement.approvals.some(approval => 
+      approval.level === 1 && approval.status === "APPROVED"
     )
 
-  // Check if Mayor has reviewed this GSO voucher
-  const mayorHasReviewedGso = disbursement && 
-    disbursement.createdBy.role === "GSO" &&
+  // Check if Mayor has already reviewed this voucher
+  const mayorHasReviewed = disbursement && 
+    disbursement.approvals && // Add null check
+    disbursement.approvals.some(approval => 
+      approval.level === 1 && approval.status === "APPROVED"
+    )
+
+  // Check if Mayor has reviewed this GSO voucher (using approval levels OR audit trails)
+  const mayorHasReviewedGsoByApproval = disbursement && 
+    disbursement?.createdBy?.role === "GSO" &&
+    disbursement.approvals && // Add null check
+    disbursement.approvals.some(approval => 
+      approval.level === 1 && approval.status === "APPROVED"
+    )
+    
+  const mayorHasReviewedGsoByAudit = disbursement && 
+    disbursement?.createdBy?.role === "GSO" &&
+    disbursement.auditTrails && // Add null check
     disbursement.auditTrails.some(trail => 
-      trail.action === "REVIEW" && 
-      trail.user.role === "MAYOR"
+      trail.action === "REVIEW" && trail.user.role === "MAYOR"
+    )
+    
+  const mayorHasReviewedGso = mayorHasReviewedGsoByApproval || mayorHasReviewedGsoByAudit
+
+  // Check if current BAC member has already reviewed this voucher
+  const currentBacMemberHasReviewed = disbursement && 
+    disbursement?.createdBy?.role === "GSO" &&
+    disbursement.bacReviews && // Add null check
+    disbursement.bacReviews.some(review => 
+      review.reviewerId === session.user.id
     )
 
   // BAC review logic - only for GSO vouchers after Mayor review
   const canBacReview = session.user.role === "BAC" && 
     disbursement && 
-    disbursement.createdBy.role === "GSO" &&
+    disbursement?.createdBy?.role === "GSO" &&
     ["PENDING", "VALIDATED", "APPROVED"].includes(disbursement.status) &&
-    mayorHasReviewedGso
+    mayorHasReviewedGso &&
+    !currentBacMemberHasReviewed // Don't allow if already reviewed
 
   // Show BAC review button for GSO vouchers (but may be disabled)
   const showBacReviewButton = session.user.role === "BAC" && 
     disbursement && 
-    disbursement.createdBy.role === "GSO" &&
-    ["PENDING", "VALIDATED", "APPROVED"].includes(disbursement.status)
+    disbursement?.createdBy?.role === "GSO" &&
+    ["PENDING", "VALIDATED", "APPROVED"].includes(disbursement.status) &&
+    mayorHasReviewedGso
 
-  // Check if BAC has reviewed this GSO voucher
+  // Debug logging for BAC review button
+  console.log("BAC Review Button Debug:", {
+    userRole: session.user.role,
+    disbursementExists: !!disbursement,
+    disbursementRole: disbursement?.createdBy?.role,
+    disbursementStatus: disbursement?.status,
+    mayorHasReviewedGso,
+    showBacReviewButton,
+    approvals: disbursement?.approvals,
+    bacReviews: disbursement?.bacReviews
+  })
+
+  // Check if BAC has reviewed this GSO voucher (3 out of 5 members required)
   const bacHasReviewedGso = disbursement && 
-    disbursement.createdBy.role === "GSO" &&
-    disbursement.auditTrails.some(trail => 
-      trail.action === "BAC_REVIEW" && 
-      trail.user.role === "BAC"
-    )
+    disbursement?.createdBy?.role === "GSO" &&
+    disbursement.bacReviews && // Add null check
+    disbursement.bacReviews.length >= 3
 
   // Budget review logic - only for GSO vouchers after BAC review
   const canBudgetReview = session.user.role === "BUDGET" && 
     disbursement && 
-    disbursement.createdBy.role === "GSO" &&
+    disbursement?.createdBy?.role === "GSO" &&
     ["PENDING", "VALIDATED", "APPROVED"].includes(disbursement.status) &&
     bacHasReviewedGso
 
-  // Show Budget review button for GSO vouchers (but may be disabled)
+  // Show Budget review button logic
   const showBudgetReviewButton = session.user.role === "BUDGET" && 
     disbursement && 
-    disbursement.createdBy.role === "GSO" &&
-    ["PENDING", "VALIDATED", "APPROVED"].includes(disbursement.status)
-
-  // Check if Budget has reviewed this GSO voucher
-  const budgetHasReviewedGso = disbursement && 
-    disbursement.createdBy.role === "GSO" &&
-    disbursement.auditTrails.some(trail => 
-      trail.action === "BUDGET_REVIEW" && 
-      trail.user.role === "BUDGET"
+    ["PENDING"].includes(disbursement.status) &&
+    disbursement.approvals && // Add null check
+    disbursement.approvals.some(approval => 
+      approval.level === 1 && approval.status === "APPROVED" // Mayor approval
+    ) && (
+      // For GSO workflow: check for BAC completion (3+ reviews) and Budget not reviewed (Level 3)
+      (disbursement?.createdBy?.role === "GSO" && 
+       disbursement.bacReviews && disbursement.bacReviews.length >= 3 && // BAC completed
+       !disbursement.approvals.some(approval => approval.level === 3 && approval.status === "APPROVED")) || // Budget not reviewed
+      // For non-GSO workflow: check for Mayor approval (Level 1) and Budget not reviewed (Level 2)
+      (disbursement?.createdBy?.role !== "GSO" && 
+       !disbursement.approvals.some(approval => approval.level === 2 && approval.status === "APPROVED")) // Budget not reviewed
     )
 
-  // Accounting review logic - only for GSO vouchers after Budget review
-  const canAccountingReview = session.user.role === "ACCOUNTING" && 
-    disbursement && 
-    disbursement.createdBy.role === "GSO" &&
-    ["PENDING", "VALIDATED", "APPROVED"].includes(disbursement.status) &&
-    budgetHasReviewedGso
+  // Check if Budget has reviewed this voucher
+  const budgetHasReviewedGso = disbursement && 
+    disbursement.approvals && // Add null check
+    disbursement.approvals.some(approval => 
+      approval.level === 3 && approval.status === "APPROVED" // Budget is Level 3 in GSO workflow
+    )
 
-  // Show Accounting review button for GSO vouchers (but may be disabled)
+  // Show Accounting review button for all vouchers after Budget approval
   const showAccountingReviewButton = session.user.role === "ACCOUNTING" && 
     disbursement && 
-    disbursement.createdBy.role === "GSO" &&
-    ["PENDING", "VALIDATED", "APPROVED"].includes(disbursement.status)
+    ["PENDING"].includes(disbursement.status) &&
+    disbursement.approvals && // Add null check
+    (
+      // For GSO workflow: check for Budget approval (Level 3) and Accounting not reviewed (Level 4)
+      (disbursement?.createdBy?.role === "GSO" && 
+       disbursement.approvals.some(approval => approval.level === 3 && approval.status === "APPROVED") && // Budget approved
+       !disbursement.approvals.some(approval => approval.level === 4 && approval.status === "APPROVED")) || // Accounting not reviewed
+      // For non-GSO workflow: check for Budget approval (Level 2) and Accounting not reviewed (Level 3)
+      (disbursement?.createdBy?.role !== "GSO" && 
+       disbursement.approvals.some(approval => approval.level === 2 && approval.status === "APPROVED") && // Budget approved
+       !disbursement.approvals.some(approval => approval.level === 3 && approval.status === "APPROVED")) // Accounting not reviewed
+    )
 
-  // Check if Accounting has reviewed this GSO voucher
-  const accountingHasReviewedGso = disbursement && 
-    disbursement.createdBy.role === "GSO" &&
-    disbursement.auditTrails.some(trail => 
-      trail.action === "ACCOUNTING_REVIEW" && 
-      trail.user.role === "ACCOUNTING"
+  // Check if Accounting has reviewed this voucher
+  const accountingHasReviewed = disbursement && 
+    disbursement.approvals && // Add null check
+    (
+      // For GSO workflow: Accounting is Level 4
+      (disbursement?.createdBy?.role === "GSO" && 
+       disbursement.approvals.some(approval => approval.level === 4 && approval.status === "APPROVED")) ||
+      // For non-GSO workflow: Accounting is Level 3
+      (disbursement?.createdBy?.role !== "GSO" && 
+       disbursement.approvals.some(approval => approval.level === 3 && approval.status === "APPROVED"))
     )
 
   // Check Treasury actions based on current state
-  const hasCheckIssuance = disbursement?.auditTrails.some(trail => 
+  const hasCheckIssuance = disbursement?.auditTrails?.some(trail => 
     trail.action === "CHECK_ISSUANCE" && trail.user.role === "TREASURY"
   )
-  const hasMarkReleased = disbursement?.auditTrails.some(trail => 
+  const hasMarkReleased = disbursement?.auditTrails?.some(trail => 
     trail.action === "MARK_RELEASED" && trail.user.role === "TREASURY"
   )
 
   const canIssueCheck = session.user.role === "TREASURY" && 
     disbursement && 
-    disbursement.createdBy.role === "GSO" &&
-    accountingHasReviewedGso && 
+    disbursement.approvals && // Add null check
+    (
+      // For GSO workflow: check for Accounting approval (Level 4)
+      (disbursement?.createdBy?.role === "GSO" && 
+       disbursement.approvals.some(approval => approval.level === 4 && approval.status === "APPROVED")) ||
+      // For non-GSO workflow: check for Accounting approval (Level 3)
+      (disbursement?.createdBy?.role !== "GSO" && 
+       disbursement.approvals.some(approval => approval.level === 3 && approval.status === "APPROVED"))
+    ) && 
     !hasCheckIssuance && 
     !hasMarkReleased
 
   const canMarkReleased = session.user.role === "TREASURY" && 
     disbursement && 
-    disbursement.createdBy.role === "GSO" &&
     hasCheckIssuance && 
     !hasMarkReleased
 
-  // Show Treasury action button for GSO vouchers
+  // Show Treasury action button for all vouchers after Accounting approval
   const showTreasuryActionButton = session.user.role === "TREASURY" && 
     disbursement && 
-    disbursement.createdBy.role === "GSO"
+    disbursement.approvals && // Add null check
+    (
+      // For GSO workflow: check for Accounting approval (Level 4)
+      (disbursement?.createdBy?.role === "GSO" && 
+       disbursement.approvals.some(approval => approval.level === 4 && approval.status === "APPROVED")) ||
+      // For non-GSO workflow: check for Accounting approval (Level 3)
+      (disbursement?.createdBy?.role !== "GSO" && 
+       disbursement.approvals.some(approval => approval.level === 3 && approval.status === "APPROVED"))
+    )
 
   // Check if BAC has already reviewed this voucher
   const bacHasReviewed = disbursement && session.user.role === "BAC" &&
-    disbursement.auditTrails.some(trail => 
+    disbursement?.auditTrails?.some(trail => 
       trail.action === "BAC_REVIEW" && 
       trail.userId === session.user.id
     )
 
   // Check if Budget has already reviewed this voucher
-  const budgetHasReviewed = disbursement && session.user.role === "BUDGET" &&
-    disbursement.auditTrails.some(trail => 
-      trail.action === "BUDGET_REVIEW" && 
-      trail.userId === session.user.id
-    )
-
-  // Check if Accounting has already reviewed this voucher
-  const accountingHasReviewed = disbursement && session.user.role === "ACCOUNTING" &&
-    disbursement.auditTrails.some(trail => 
-      trail.action === "ACCOUNTING_REVIEW" && 
-      trail.userId === session.user.id
+  const budgetHasReviewed = disbursement && 
+    disbursement.approvals && // Add null check
+    (
+      // For GSO workflow: Budget is Level 3
+      (disbursement?.createdBy?.role === "GSO" && 
+       disbursement.approvals.some(approval => approval.level === 3 && approval.status === "APPROVED")) ||
+      // For non-GSO workflow: Budget is Level 2
+      (disbursement?.createdBy?.role !== "GSO" && 
+       disbursement.approvals.some(approval => approval.level === 2 && approval.status === "APPROVED"))
     )
 
   // Check if Treasury has already reviewed this voucher
   const treasuryHasReviewed = disbursement && session.user.role === "TREASURY" &&
-    disbursement.auditTrails.some(trail => 
+    disbursement?.auditTrails?.some(trail => 
       trail.action === "TREASURY_REVIEW" && 
       trail.userId === session.user.id
     )
@@ -703,13 +1066,13 @@ export default function DisbursementDetailPage() {
               Back
             </Button>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">{disbursement.payee}</h1>
-              <p className="text-gray-600">Disbursement Voucher #{disbursement.id.slice(-8)}</p>
+              <h1 className="text-2xl font-bold text-gray-900">{disbursement?.payee}</h1>
+              <p className="text-gray-600">Disbursement Voucher #{disbursement?.id?.slice(-8)}</p>
             </div>
           </div>
           <div className="flex items-center space-x-2">
-            <Badge className={getStatusColor(disbursement.status)}>
-              {disbursement.status}
+            <Badge className={getStatusColor(disbursement?.status)}>
+              {disbursement?.status}
             </Badge>
             {canSubmit && (
               <Button 
@@ -745,7 +1108,7 @@ export default function DisbursementDetailPage() {
             )}
             {canMayorReview && (
               <Button 
-                onClick={handleReview}
+                onClick={() => setShowReviewDialog(true)}
                 disabled={isApproving || mayorHasReviewed}
                 className={mayorHasReviewed 
                   ? "bg-gray-400 hover:bg-gray-400 cursor-not-allowed" 
@@ -762,17 +1125,18 @@ export default function DisbursementDetailPage() {
             )}
             {showBacReviewButton && (
               <Button 
-                onClick={handleBacReview}
-                disabled={isApproving || bacHasReviewed || !mayorHasReviewedGso}
-                className={bacHasReviewed 
+                onClick={() => setShowReviewDialog(true)}
+                disabled={isApproving || currentBacMemberHasReviewed || !mayorHasReviewedGso}
+                className={currentBacMemberHasReviewed 
                   ? "bg-gray-400 hover:bg-gray-400 cursor-not-allowed" 
                   : !mayorHasReviewedGso
                   ? "bg-gray-300 hover:bg-gray-300 cursor-not-allowed"
                   : "bg-purple-600 hover:bg-purple-700"
                 }
-                title={!mayorHasReviewedGso ? "Waiting for Mayor's review" : ""}
+                title={!mayorHasReviewedGso ? "Waiting for Mayor's review" : 
+                       currentBacMemberHasReviewed ? "You have already reviewed this voucher" : ""}
               >
-                {bacHasReviewed ? (
+                {currentBacMemberHasReviewed ? (
                   <CheckCircle className="mr-2 h-4 w-4" />
                 ) : !mayorHasReviewedGso ? (
                   <Clock className="mr-2 h-4 w-4" />
@@ -780,58 +1144,72 @@ export default function DisbursementDetailPage() {
                   <Eye className="mr-2 h-4 w-4" />
                 )}
                 {isApproving ? "Processing..." : 
-                 bacHasReviewed ? "BAC Reviewed" : 
+                 currentBacMemberHasReviewed ? "You Reviewed" : 
                  !mayorHasReviewedGso ? "Awaiting Mayor Review" : 
                  "BAC Review"}
               </Button>
             )}
+            
+            {/* BAC Review Status Display */}
+            {disbursement?.createdBy.role === "GSO" && disbursement?.bacReviews && (
+              <div className="mt-2 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Eye className="h-4 w-4 text-purple-600" />
+                    <span className="text-sm font-medium text-purple-800">
+                      BAC Reviews: {disbursement?.bacReviews?.length || 0}/5 members
+                    </span>
+                  </div>
+                  <div className="text-sm text-purple-600">
+                    {(disbursement?.bacReviews?.length || 0) >= 3 ? (
+                      <span className="text-green-600 font-medium">✓ Complete (3+ reviews)</span>
+                    ) : (
+                      <span>Need {3 - (disbursement?.bacReviews?.length || 0)} more reviews</span>
+                    )}
+                  </div>
+                </div>
+                {(disbursement?.bacReviews?.length || 0) > 0 && (
+                  <div className="mt-2 text-xs text-purple-600">
+                    Reviewed by: {disbursement?.bacReviews?.map((review) => review.reviewer.name).join(", ") || "None"}
+                  </div>
+                )}
+              </div>
+            )}
             {showBudgetReviewButton && (
               <Button 
-                onClick={handleBudgetReview}
-                disabled={isApproving || budgetHasReviewed || !bacHasReviewedGso}
-                className={budgetHasReviewed 
+                onClick={() => setShowReviewDialog(true)}
+                disabled={isApproving || budgetHasReviewed || budgetHasReviewedGso}
+                className={budgetHasReviewed || budgetHasReviewedGso 
                   ? "bg-gray-400 hover:bg-gray-400 cursor-not-allowed" 
-                  : !bacHasReviewedGso
-                  ? "bg-gray-300 hover:bg-gray-300 cursor-not-allowed"
                   : "bg-orange-600 hover:bg-orange-700"
                 }
-                title={!bacHasReviewedGso ? "Waiting for BAC's review" : ""}
               >
-                {budgetHasReviewed ? (
+                {budgetHasReviewed || budgetHasReviewedGso ? (
                   <CheckCircle className="mr-2 h-4 w-4" />
-                ) : !bacHasReviewedGso ? (
-                  <Clock className="mr-2 h-4 w-4" />
                 ) : (
                   <Eye className="mr-2 h-4 w-4" />
                 )}
                 {isApproving ? "Processing..." : 
-                 budgetHasReviewed ? "Budget Reviewed" : 
-                 !bacHasReviewedGso ? "Awaiting BAC Review" : 
+                 budgetHasReviewed || budgetHasReviewedGso ? "Budget Reviewed" : 
                  "Budget Review"}
               </Button>
             )}
             {showAccountingReviewButton && (
               <Button 
-                onClick={handleAccountingReview}
-                disabled={isApproving || accountingHasReviewed || !budgetHasReviewedGso}
+                onClick={() => setShowReviewDialog(true)}
+                disabled={isApproving || accountingHasReviewed}
                 className={accountingHasReviewed 
                   ? "bg-gray-400 hover:bg-gray-400 cursor-not-allowed" 
-                  : !budgetHasReviewedGso
-                  ? "bg-gray-300 hover:bg-gray-300 cursor-not-allowed"
                   : "bg-green-600 hover:bg-green-700"
                 }
-                title={!budgetHasReviewedGso ? "Waiting for Budget Office review" : ""}
               >
                 {accountingHasReviewed ? (
                   <CheckCircle className="mr-2 h-4 w-4" />
-                ) : !budgetHasReviewedGso ? (
-                  <Clock className="mr-2 h-4 w-4" />
                 ) : (
                   <Eye className="mr-2 h-4 w-4" />
                 )}
                 {isApproving ? "Processing..." : 
                  accountingHasReviewed ? "Accounting Reviewed" : 
-                 !budgetHasReviewedGso ? "Awaiting Budget Review" : 
                  "Accounting Review"}
               </Button>
             )}
@@ -846,7 +1224,14 @@ export default function DisbursementDetailPage() {
                       className="w-48"
                     />
                     <Button 
-                      onClick={() => handleTreasuryAction("CHECK_ISSUANCE")}
+                      onClick={() => {
+                        if (!checkNumber.trim()) {
+                          setError("Check number is required")
+                          return
+                        }
+                        setTreasuryAction("CHECK_ISSUANCE")
+                        setShowTreasuryDialog(true)
+                      }}
                       disabled={isApproving || !checkNumber.trim()}
                       className="bg-blue-600 hover:bg-blue-700"
                     >
@@ -857,7 +1242,10 @@ export default function DisbursementDetailPage() {
                 
                 {canMarkReleased && (
                   <Button 
-                    onClick={() => handleTreasuryAction("MARK_RELEASED")}
+                    onClick={() => {
+                      setTreasuryAction("MARK_RELEASED")
+                      setShowTreasuryDialog(true)
+                    }}
                     disabled={isApproving}
                     className="bg-green-600 hover:bg-green-700"
                   >
@@ -877,9 +1265,18 @@ export default function DisbursementDetailPage() {
               </div>
             )}
             {canEdit && (
-              <Button variant="outline">
+              <Button variant="outline" onClick={handleEdit}>
                 <Edit className="mr-2 h-4 w-4" />
                 Edit
+              </Button>
+            )}
+            {canEdit && (
+              <Button 
+                variant="destructive" 
+                onClick={() => setShowDeleteDialog(true)}
+              >
+                <XCircle className="mr-2 h-4 w-4" />
+                Delete
               </Button>
             )}
             <Button 
@@ -1087,8 +1484,8 @@ export default function DisbursementDetailPage() {
                 </div>
                 <div>
                   <label className="text-sm font-medium text-gray-600">Created By</label>
-                  <p className="text-sm text-gray-900">{disbursement.createdBy.name}</p>
-                  <p className="text-xs text-gray-600">{disbursement.createdBy.department}</p>
+                  <p className="text-sm text-gray-900">{disbursement?.createdBy?.name}</p>
+                  <p className="text-xs text-gray-600">{disbursement?.createdBy?.department}</p>
                 </div>
                 {disbursement.assignedTo && (
                   <div>
@@ -1340,6 +1737,257 @@ export default function DisbursementDetailPage() {
                   <>
                     <Send className="mr-2 h-4 w-4" />
                     Submit Remarks
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Review Confirmation Dialog */}
+        <Dialog open={showReviewDialog} onOpenChange={(open) => {
+          setShowReviewDialog(open)
+          if (!open) {
+            setReviewPassword("")
+            setReviewPasswordError("")
+          }
+        }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center">
+                <Eye className="mr-2 h-5 w-5" />
+                Confirm Review Action
+              </DialogTitle>
+              <DialogDescription>
+                Please enter your password to confirm this review action.
+                <br />
+                <strong>Disbursement:</strong> {disbursement?.payee}
+                <br />
+                <strong>Amount:</strong> {formatCurrency(Number(disbursement?.amount || 0))}
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-2 block">
+                  Enter your password to confirm review *
+                </label>
+                <Input
+                  type="password"
+                  placeholder="Enter your password"
+                  value={reviewPassword}
+                  onChange={(e) => {
+                    setReviewPassword(e.target.value)
+                    setReviewPasswordError("")
+                  }}
+                  className={reviewPasswordError ? "border-red-500" : ""}
+                />
+                {reviewPasswordError && (
+                  <p className="text-sm text-red-600 mt-1">{reviewPasswordError}</p>
+                )}
+              </div>
+            </div>
+            
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowReviewDialog(false)
+                  setReviewPassword("")
+                  setReviewPasswordError("")
+                }}
+                disabled={isApproving}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  if (session.user.role === "BAC") {
+                    handleBacReview()
+                  } else if (session.user.role === "BUDGET") {
+                    handleBudgetReview()
+                  } else if (session.user.role === "MAYOR") {
+                    handleApproval("APPROVED")
+                  } else if (session.user.role === "ACCOUNTING") {
+                    handleApproval("APPROVED")
+                  }
+                }}
+                disabled={isApproving || !reviewPassword.trim()}
+                className="bg-purple-600 hover:bg-purple-700"
+              >
+                {isApproving ? (
+                  <>
+                    <Clock className="mr-2 h-4 w-4 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <Eye className="mr-2 h-4 w-4" />
+                    Confirm Review
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={showDeleteDialog} onOpenChange={(open) => {
+          setShowDeleteDialog(open)
+          if (!open) {
+            setDeletePassword("")
+            setPasswordError("")
+          }
+        }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center text-red-600">
+                <XCircle className="mr-2 h-5 w-5" />
+                Delete Disbursement Voucher
+              </DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete this disbursement voucher? This action cannot be undone.
+                <br />
+                <strong>Payee:</strong> {disbursement?.payee}
+                <br />
+                <strong>Amount:</strong> {formatCurrency(Number(disbursement?.amount || 0))}
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-2 block">
+                  Enter your password to confirm deletion *
+                </label>
+                <Input
+                  type="password"
+                  placeholder="Enter your password"
+                  value={deletePassword}
+                  onChange={(e) => {
+                    setDeletePassword(e.target.value)
+                    setPasswordError("")
+                  }}
+                  className={passwordError ? "border-red-500" : ""}
+                />
+                {passwordError && (
+                  <p className="text-sm text-red-600 mt-1">{passwordError}</p>
+                )}
+              </div>
+            </div>
+            
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowDeleteDialog(false)
+                  setDeletePassword("")
+                  setPasswordError("")
+                }}
+                disabled={isDeleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={isDeleting || !deletePassword.trim()}
+              >
+                {isDeleting ? (
+                  <>
+                    <Clock className="mr-2 h-4 w-4 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="mr-2 h-4 w-4" />
+                    Delete
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Treasury Action Confirmation Dialog */}
+        <Dialog open={showTreasuryDialog} onOpenChange={(open) => {
+          setShowTreasuryDialog(open)
+          if (!open) {
+            setTreasuryPassword("")
+            setTreasuryPasswordError("")
+            setTreasuryAction(null)
+          }
+        }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center">
+                <DollarSign className="mr-2 h-5 w-5" />
+                Confirm Treasury Action
+              </DialogTitle>
+              <DialogDescription>
+                Please enter your password to confirm this Treasury action.
+                <br />
+                <strong>Disbursement:</strong> {disbursement?.payee}
+                <br />
+                <strong>Amount:</strong> {formatCurrency(Number(disbursement?.amount || 0))}
+                <br />
+                <strong>Action:</strong> {treasuryAction === "CHECK_ISSUANCE" ? "Check Number Issuance" : "Mark as Released"}
+                {treasuryAction === "CHECK_ISSUANCE" && (
+                  <>
+                    <br />
+                    <strong>Check Number:</strong> {checkNumber}
+                  </>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-2 block">
+                  Enter your password to confirm Treasury action *
+                </label>
+                <Input
+                  type="password"
+                  placeholder="Enter your password"
+                  value={treasuryPassword}
+                  onChange={(e) => {
+                    setTreasuryPassword(e.target.value)
+                    setTreasuryPasswordError("")
+                  }}
+                  className={treasuryPasswordError ? "border-red-500" : ""}
+                />
+                {treasuryPasswordError && (
+                  <p className="text-sm text-red-600 mt-1">{treasuryPasswordError}</p>
+                )}
+              </div>
+            </div>
+            
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowTreasuryDialog(false)
+                  setTreasuryPassword("")
+                  setTreasuryPasswordError("")
+                  setTreasuryAction(null)
+                }}
+                disabled={isApproving}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleTreasuryPasswordVerification}
+                disabled={isApproving || !treasuryPassword.trim()}
+                className={treasuryAction === "CHECK_ISSUANCE" ? "bg-blue-600 hover:bg-blue-700" : "bg-green-600 hover:bg-green-700"}
+              >
+                {isApproving ? (
+                  <>
+                    <Clock className="mr-2 h-4 w-4 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <DollarSign className="mr-2 h-4 w-4" />
+                    Confirm {treasuryAction === "CHECK_ISSUANCE" ? "Check Issuance" : "Release"}
                   </>
                 )}
               </Button>

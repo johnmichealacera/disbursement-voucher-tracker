@@ -38,6 +38,10 @@ export async function POST(
       include: {
         createdBy: { select: { id: true, name: true, role: true, department: true } },
         items: true,
+        approvals: { 
+          include: { approver: { select: { id: true, name: true, role: true } } }, 
+          orderBy: { level: "asc" } 
+        },
         auditTrails: {
           include: { user: { select: { name: true, role: true } } },
           orderBy: { timestamp: "desc" }
@@ -51,16 +55,14 @@ export async function POST(
 
     // Handle different actions
     if (validatedData.action === "CHECK_ISSUANCE") {
-      // For check issuance, check if it's a GSO voucher and Accounting has reviewed
-      if (disbursement.createdBy.role !== "GSO") {
-        return NextResponse.json({ 
-          error: "Treasury Office can only issue checks for GSO department vouchers" 
-        }, { status: 403 })
-      }
-
-      // Check if Accounting has already reviewed this voucher
-      const accountingHasReviewed = disbursement.auditTrails.some(trail => 
-        trail.action === "ACCOUNTING_REVIEW" && trail.user.role === "ACCOUNTING"
+      // Check if Accounting has already reviewed this voucher (using approval levels)
+      const accountingHasReviewed = (
+        // For GSO workflow: Accounting is Level 4
+        (disbursement.createdBy.role === "GSO" && 
+         disbursement.approvals.some(approval => approval.level === 4 && approval.status === "APPROVED")) ||
+        // For non-GSO workflow: Accounting is Level 3
+        (disbursement.createdBy.role !== "GSO" && 
+         disbursement.approvals.some(approval => approval.level === 3 && approval.status === "APPROVED"))
       )
 
       if (!accountingHasReviewed) {

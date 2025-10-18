@@ -26,34 +26,49 @@ export function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false)
   const { notifications, unreadCount, loading, refresh } = useNotifications()
 
-  const handleNotificationClick = (disbursementId: string) => {
-    router.push(`/disbursements/${disbursementId}`)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleNotificationClick = async (notification: any) => {
+    // Mark notification as read if it's a stored notification (has a database ID)
+    if (notification.id && !notification.id.startsWith('mayor-') && !notification.id.startsWith('budget-') && 
+        !notification.id.startsWith('accounting-') && !notification.id.startsWith('treasury-') && 
+        !notification.id.startsWith('bac-') && !notification.id.startsWith('requester-') && 
+        !notification.id.startsWith('admin-')) {
+      try {
+        await fetch(`/api/notifications/${notification.id}/read`, {
+          method: "PATCH"
+        })
+      } catch (error) {
+        console.error("Error marking notification as read:", error)
+      }
+    }
+    
+    router.push(`/disbursements/${notification.disbursementId}`)
     setIsOpen(false)
   }
 
   const getPriorityIcon = (priority: string) => {
     switch (priority) {
       case "high":
-        return <AlertCircle className="h-4 w-4 text-red-500" />
+        return <AlertCircle className="h-4 w-4 text-yellow-600" />
       case "medium":
         return <Clock className="h-4 w-4 text-yellow-500" />
       case "low":
-        return <CheckCircle className="h-4 w-4 text-green-500" />
+        return <CheckCircle className="h-4 w-4 text-yellow-400" />
       default:
-        return <FileText className="h-4 w-4 text-gray-500" />
+        return <FileText className="h-4 w-4 text-yellow-500" />
     }
   }
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case "high":
-        return "border-l-red-500 bg-red-50"
+        return "border-l-yellow-600 bg-yellow-50"
       case "medium":
         return "border-l-yellow-500 bg-yellow-50"
       case "low":
-        return "border-l-green-500 bg-green-50"
+        return "border-l-yellow-400 bg-yellow-50"
       default:
-        return "border-l-gray-500 bg-gray-50"
+        return "border-l-yellow-500 bg-yellow-50"
     }
   }
 
@@ -80,13 +95,13 @@ export function NotificationBell() {
         <Button 
           variant="ghost" 
           size="sm" 
-          className={`relative transition-colors ${unreadCount > 0 ? "text-red-600 hover:text-red-700" : ""}`}
+          className={`relative transition-colors ${unreadCount > 0 ? "text-yellow-600 hover:text-yellow-700" : ""}`}
         >
           <Bell className={`h-5 w-5 ${unreadCount > 0 ? "animate-pulse" : ""}`} />
           {unreadCount > 0 && (
             <Badge 
-              variant="destructive" 
-              className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs animate-bounce"
+              variant="secondary" 
+              className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs animate-bounce bg-yellow-500 text-white"
             >
               {unreadCount > 9 ? "9+" : unreadCount}
             </Badge>
@@ -131,7 +146,7 @@ export function NotificationBell() {
                 <div
                   key={notification.id}
                   className={`p-3 rounded-lg border-l-4 cursor-pointer hover:bg-gray-100 transition-colors ${getPriorityColor(notification.priority)}`}
-                  onClick={() => handleNotificationClick(notification.disbursementId)}
+                  onClick={() => handleNotificationClick(notification)}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex items-start space-x-2 flex-1">

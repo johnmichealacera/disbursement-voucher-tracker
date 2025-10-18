@@ -63,6 +63,7 @@ model User {
   approvals           Approval[]
   auditTrails         AuditTrail[]
   notifications       Notification[]
+  bacReviews          BacReview[]
   accounts            Account[]
   sessions            Session[]
 
@@ -97,6 +98,7 @@ model DisbursementVoucher {
   approvals     Approval[]
   auditTrails   AuditTrail[]
   notifications Notification[]
+  bacReviews    BacReview[]
 
   @@map("disbursement_vouchers")
 }
@@ -199,6 +201,25 @@ model Notification {
   disbursementVoucher DisbursementVoucher? @relation(fields: [disbursementVoucherId], references: [id], onDelete: Cascade)
   
   @@map("notifications")
+}
+
+model BacReview {
+  id         String   @id @default(cuid())
+  status     ApprovalStatus @default(PENDING)
+  comments   String?
+  
+  reviewerId            String
+  disbursementVoucherId String
+  
+  createdAt  DateTime  @default(now())
+  reviewedAt DateTime?
+
+  // Relations
+  reviewer            User                @relation(fields: [reviewerId], references: [id])
+  disbursementVoucher DisbursementVoucher @relation(fields: [disbursementVoucherId], references: [id], onDelete: Cascade)
+
+  @@unique([reviewerId, disbursementVoucherId])
+  @@map("bac_reviews")
 }
 
 // NextAuth.js required models

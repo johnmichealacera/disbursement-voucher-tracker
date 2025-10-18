@@ -48,11 +48,21 @@ export async function POST(
       }, { status: 400 })
     }
 
-    // Validate that disbursement has required data
-    if (!disbursement.items || disbursement.items.length === 0) {
-      return NextResponse.json({ 
-        error: "Cannot submit disbursement without items" 
-      }, { status: 400 })
+    // Validate that disbursement has required data based on user role
+    if (disbursement.createdBy.role === "GSO") {
+      // GSO users must have items
+      if (!disbursement.items || disbursement.items.length === 0) {
+        return NextResponse.json({ 
+          error: "Cannot submit disbursement without items" 
+        }, { status: 400 })
+      }
+    } else {
+      // Non-GSO users must have a valid amount
+      if (!disbursement.amount || disbursement.amount.toNumber() <= 0) {
+        return NextResponse.json({ 
+          error: "Cannot submit disbursement without a valid amount" 
+        }, { status: 400 })
+      }
     }
 
     // Update status to PENDING

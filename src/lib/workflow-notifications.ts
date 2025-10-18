@@ -37,6 +37,16 @@ export async function sendWorkflowNotifications(data: NotificationData) {
     // Create notification message based on the action
     const notificationMessage = createNotificationMessage(data)
     
+    // First, delete existing notifications for this disbursement to prevent stacking
+    await prisma.notification.deleteMany({
+      where: {
+        disbursementVoucherId: data.disbursementId,
+        userId: {
+          in: usersToNotify.map(user => user.id)
+        }
+      }
+    })
+    
     // Create notifications for all relevant users
     const notifications = usersToNotify.map(user => ({
       type: "workflow_update",
@@ -70,11 +80,11 @@ function getDepartmentsToNotify(disbursementCreatedBy: UserRole, action: string)
     // GSO workflow: Mayor, BAC, Budget, Accounting, Treasury
     baseDepartments.push("MAYOR", "BAC", "BUDGET", "ACCOUNTING", "TREASURY")
   } else if (disbursementCreatedBy === "HR") {
-    // HR workflow: Department Head, Finance Head, Mayor, Treasury
-    baseDepartments.push("DEPARTMENT_HEAD", "FINANCE_HEAD", "MAYOR", "TREASURY")
+    // HR workflow: Mayor, Budget, Accounting, Treasury (BAC removed)
+    baseDepartments.push("MAYOR", "BUDGET", "ACCOUNTING", "TREASURY")
   } else {
-    // Standard workflow: Department Head, Finance Head, Accounting, Mayor, Treasury
-    baseDepartments.push("DEPARTMENT_HEAD", "FINANCE_HEAD", "ACCOUNTING", "MAYOR", "TREASURY")
+    // Standard workflow: Mayor, Budget, Accounting, Treasury (BAC removed)
+    baseDepartments.push("MAYOR", "BUDGET", "ACCOUNTING", "TREASURY")
   }
   
   // Remove duplicates

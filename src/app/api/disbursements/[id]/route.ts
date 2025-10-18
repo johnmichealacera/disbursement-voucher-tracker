@@ -80,6 +80,20 @@ export async function GET(
             level: "asc"
           }
         },
+        bacReviews: {
+          include: {
+            reviewer: {
+              select: {
+                id: true,
+                name: true,
+                role: true
+              }
+            }
+          },
+          orderBy: {
+            createdAt: "desc"
+          }
+        },
         auditTrails: {
           include: {
             user: {
@@ -195,7 +209,8 @@ export async function PATCH(
             id: true,
             name: true,
             email: true,
-            department: true
+            department: true,
+            role: true
           }
         },
         assignedTo: {

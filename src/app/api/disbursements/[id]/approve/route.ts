@@ -14,14 +14,26 @@ const approvalSchema = z.object({
 
 // Define approval levels and required roles
 const APPROVAL_LEVELS = {
-  1: ["DEPARTMENT_HEAD"],
-  2: ["FINANCE_HEAD", "ACCOUNTING"],
-  3: ["MAYOR"],
-  4: ["ADMIN"],
-  5: ["REQUESTER"]
+  1: ["MAYOR"],
+  2: ["BUDGET"], // Budget for standard workflow, BAC for GSO workflow (handled separately)
+  3: ["ACCOUNTING"], // Accounting for standard workflow, Budget for GSO workflow
+  4: ["TREASURY"], // Treasury for standard workflow, Accounting for GSO workflow
+  5: ["ADMIN"] // Admin for both workflows, Treasury for GSO workflow
 }
 
-function getApprovalLevel(role: UserRole): number | null {
+function getApprovalLevel(role: UserRole, disbursementRole?: string): number | null {
+  // Handle GSO workflow
+  if (disbursementRole === "GSO") {
+    switch (role) {
+      case "MAYOR": return 1
+      case "BUDGET": return 3 // Budget is Level 3 in GSO workflow
+      case "ACCOUNTING": return 4 // Accounting is Level 4 in GSO workflow
+      case "TREASURY": return 5 // Treasury is Level 5 in GSO workflow
+      default: return null
+    }
+  }
+  
+  // Handle standard workflow (non-GSO)
   for (const [level, roles] of Object.entries(APPROVAL_LEVELS)) {
     if (roles.includes(role)) {
       return parseInt(level)
@@ -34,8 +46,10 @@ function getNextVoucherStatus(level: number, approved: boolean): VoucherStatus {
   if (!approved) return "REJECTED"
   
   switch (level) {
-    case 1: return "VALIDATED"
-    case 2: return "APPROVED"
+    case 1: return "PENDING" // Mayor approval - moves to next level
+    case 2: return "PENDING" // Budget approval - moves to next level
+    case 3: return "PENDING" // Accounting approval - moves to next level
+    case 4: return "RELEASED" // Treasury approval - final release
     default: return "PENDING"
   }
 }
@@ -76,13 +90,13 @@ export async function POST(
     }
 
     // Check if user can approve at their level
-    const userApprovalLevel = getApprovalLevel(session.user.role)
+    const userApprovalLevel = getApprovalLevel(session.user.role, disbursement.createdBy.role)
     if (!userApprovalLevel) {
       return NextResponse.json({ error: "You don't have approval permissions" }, { status: 403 })
     }
 
     // Check if disbursement is in the right status for approval
-    if (!["PENDING", "VALIDATED"].includes(disbursement.status)) {
+    if (!["PENDING"].includes(disbursement.status)) {
       return NextResponse.json({ error: "Disbursement is not ready for approval" }, { status: 400 })
     }
 

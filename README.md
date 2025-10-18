@@ -432,6 +432,39 @@ For technical support or questions:
 - **Error Handling**: Improved error handling and validation across all components
 - **Code Quality**: Cleaned up unused imports and improved code organization
 
+## 🐛 Critical Bug Fixes (v3.3)
+
+### **🔧 Workflow Logic Fixes**
+- **Fixed GSO vs Standard Workflow Approval Levels**: Corrected hardcoded approval level checks that were causing incorrect button states and progress calculations
+- **Budget Review Logic**: Fixed budget review button showing "already reviewed" when it wasn't actually reviewed in GSO workflows
+- **Accounting Review Logic**: Fixed accounting review button logic to check correct approval levels based on workflow type
+- **Treasury Review Logic**: Fixed treasury action buttons to wait for correct accounting approval levels
+
+### **⚡ Data Loading Race Condition Fixes**
+- **Eliminated Runtime Errors**: Fixed "Cannot read properties of undefined" errors by implementing proper data validation
+- **Progress Bar Accuracy**: Fixed progress bar showing incorrect states due to incomplete data loading
+- **Component Rendering**: Added comprehensive data completeness validation before rendering main component
+- **Loading State Management**: Improved loading state handling to prevent premature rendering
+
+### **🛡️ Robust Data Validation**
+- **Complete Data Check**: Added `isDisbursementDataComplete()` function to validate all required data before rendering
+- **Workflow-Specific Validation**: Ensures GSO workflows have `bacReviews` data loaded before rendering
+- **Array Validation**: Validates `approvals`, `auditTrails`, and other critical arrays are present
+- **Type Safety**: Enhanced TypeScript typing for better error prevention
+
+### **🎯 Impact**
+- **Treasury View**: Treasury users now see accurate progress states and correct workflow progression
+- **GSO Workflow**: BAC reviews, Budget, and Accounting steps now display correct completion status
+- **Standard Workflow**: All approval levels show accurate states without race conditions
+- **User Experience**: No more incorrect "already reviewed" messages or wrong progress percentages
+- **Reliability**: Components render consistently on first load without requiring page refreshes
+
+### **🔧 Technical Details**
+- **Approval Level Mapping**: Fixed GSO workflow to use correct levels (Budget=3, Accounting=4, Treasury=5)
+- **Data Loading**: Modified `fetchDisbursement()` to only set loading=false when data is complete
+- **Null Safety**: Replaced band-aid optional chaining with proper data validation
+- **Progress Calculation**: Fixed `progress-utils.ts` to handle GSO workflow approval sequences correctly
+
 ## 🔮 Future Enhancements
 
 - **Email Notifications**: Automated status change notifications

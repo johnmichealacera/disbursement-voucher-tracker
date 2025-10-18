@@ -38,7 +38,11 @@ export function formatDateTime(date: Date | string): string {
   }).format(d)
 }
 
-export function getStatusColor(status: string): string {
+export function getStatusColor(status: string | undefined | null): string {
+  if (!status) {
+    return 'bg-gray-100 text-gray-800'
+  }
+  
   switch (status.toLowerCase()) {
     case 'draft':
       return 'bg-gray-100 text-gray-800'

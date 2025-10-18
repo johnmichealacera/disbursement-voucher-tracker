@@ -79,8 +79,36 @@ async function main() {
       department: 'Human Resources'
     },
     {
-      name: 'BAC Member',
-      email: 'bac@municipality.gov',
+      name: 'BAC Member 1',
+      email: 'bac1@municipality.gov',
+      password: await bcrypt.hash('bac123', 12),
+      role: 'BAC' as UserRole,
+      department: 'Bids and Awards Committee'
+    },
+    {
+      name: 'BAC Member 2',
+      email: 'bac2@municipality.gov',
+      password: await bcrypt.hash('bac123', 12),
+      role: 'BAC' as UserRole,
+      department: 'Bids and Awards Committee'
+    },
+    {
+      name: 'BAC Member 3',
+      email: 'bac3@municipality.gov',
+      password: await bcrypt.hash('bac123', 12),
+      role: 'BAC' as UserRole,
+      department: 'Bids and Awards Committee'
+    },
+    {
+      name: 'BAC Member 4',
+      email: 'bac4@municipality.gov',
+      password: await bcrypt.hash('bac123', 12),
+      role: 'BAC' as UserRole,
+      department: 'Bids and Awards Committee'
+    },
+    {
+      name: 'BAC Member 5',
+      email: 'bac5@municipality.gov',
       password: await bcrypt.hash('bac123', 12),
       role: 'BAC' as UserRole,
       department: 'Bids and Awards Committee'
@@ -253,7 +281,11 @@ async function main() {
   console.log('Finance Head: finhead@municipality.gov / finhead123')
   console.log('GSO: gso@municipality.gov / gso123')
   console.log('HR: hr@municipality.gov / hr123')
-  console.log('BAC: bac@municipality.gov / bac123')
+  console.log('BAC Member 1: bac1@municipality.gov / bac123')
+  console.log('BAC Member 2: bac2@municipality.gov / bac123')
+  console.log('BAC Member 3: bac3@municipality.gov / bac123')
+  console.log('BAC Member 4: bac4@municipality.gov / bac123')
+  console.log('BAC Member 5: bac5@municipality.gov / bac123')
 }
 
 main()

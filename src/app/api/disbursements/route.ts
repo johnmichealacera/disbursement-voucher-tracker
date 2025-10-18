@@ -22,7 +22,7 @@ const createDisbursementSchema = z.object({
     unit: z.string().min(1, "Unit is required"),
     unitPrice: z.number().positive("Unit price must be positive"),
     totalPrice: z.number().positive("Total price must be positive")
-  }))
+  })).optional().default([])
 })
 
 export async function GET(request: NextRequest) {
@@ -93,14 +93,14 @@ export async function GET(request: NextRequest) {
         role: "GSO"
       }
     } else if (session.user.role === "BUDGET") {
-      // Budget Office can view all GSO vouchers (review button will be controlled in UI)
-      where.createdBy = {
-        role: "GSO"
+      // Budget Office can view all vouchers that need their review
+      where.status = {
+        in: ["PENDING", "VALIDATED", "APPROVED", "RELEASED", "REJECTED"]
       }
     } else if (session.user.role === "TREASURY") {
-      // Treasury can view all GSO vouchers (review button will be controlled in UI)
-      where.createdBy = {
-        role: "GSO"
+      // Treasury can view all vouchers that need their review
+      where.status = {
+        in: ["PENDING", "VALIDATED", "APPROVED", "RELEASED", "REJECTED"]
       }
     }
 
@@ -185,9 +185,9 @@ export async function POST(request: NextRequest) {
         remarks: validatedData.remarks,
         createdById: session.user.id,
         status: validatedData.status || "DRAFT",
-        items: {
+        items: validatedData.items && validatedData.items.length > 0 ? {
           create: validatedData.items
-        }
+        } : undefined
       },
       include: {
         createdBy: {
