@@ -69,6 +69,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function generateActivityDescription(activity: any): string {
   const { action, entityType, oldValues, newValues } = activity
   
