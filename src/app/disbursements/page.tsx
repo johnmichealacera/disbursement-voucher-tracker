@@ -81,7 +81,11 @@ function DisbursementsContent() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState(searchParams.get("status") || "")
-  const [departmentFilter, setDepartmentFilter] = useState("")
+  const [minAmountFilter, setMinAmountFilter] = useState("")
+  const [maxAmountFilter, setMaxAmountFilter] = useState("")
+  const [startDateFilter, setStartDateFilter] = useState("")
+  const [endDateFilter, setEndDateFilter] = useState("")
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
 
   const fetchDisbursements = async (page = 1) => {
     setLoading(true)
@@ -92,7 +96,11 @@ function DisbursementsContent() {
       })
       
       if (statusFilter) params.append("status", statusFilter)
-      if (departmentFilter) params.append("department", departmentFilter)
+      if (searchTerm) params.append("search", searchTerm)
+      if (minAmountFilter) params.append("minAmount", minAmountFilter)
+      if (maxAmountFilter) params.append("maxAmount", maxAmountFilter)
+      if (startDateFilter) params.append("startDate", startDateFilter)
+      if (endDateFilter) params.append("endDate", endDateFilter)
 
       const response = await fetch(`/api/disbursements?${params}`)
       if (response.ok) {
@@ -111,7 +119,7 @@ function DisbursementsContent() {
     if (session) {
       fetchDisbursements()
     }
-  }, [session, statusFilter, departmentFilter])
+  }, [session, statusFilter, searchTerm, minAmountFilter, maxAmountFilter, startDateFilter, endDateFilter])
 
   const handleStatusFilter = (status: string) => {
     const actualStatus = status === "ALL" ? "" : status
@@ -125,10 +133,17 @@ function DisbursementsContent() {
     router.push(`/disbursements?${params}`)
   }
 
-  const filteredDisbursements = disbursements.filter(disbursement =>
-    disbursement?.payee?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    disbursement.createdBy.name.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const clearAllFilters = () => {
+    setStatusFilter("")
+    setMinAmountFilter("")
+    setMaxAmountFilter("")
+    setStartDateFilter("")
+    setEndDateFilter("")
+    setSearchTerm("")
+    router.push("/disbursements")
+  }
+
+  const filteredDisbursements = disbursements
 
   if (!session) {
     return null
@@ -168,37 +183,100 @@ function DisbursementsContent() {
         {/* Filters */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg flex items-center">
-              <Filter className="mr-2 h-5 w-5" />
-              Filters
+            <CardTitle className="text-lg flex items-center justify-between">
+              <div className="flex items-center">
+                <Filter className="mr-2 h-5 w-5" />
+                Filters
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                >
+                  {showAdvancedFilters ? "Hide" : "Show"} Advanced
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={clearAllFilters}
+                >
+                  Clear All
+                </Button>
+              </div>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="flex-1">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                  <Input
-                    placeholder="Search by title or requester..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
+            {/* Basic Filters */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Input
+                  placeholder="Search by payee, particulars, or requester..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
               </div>
               <Select value={statusFilter || "ALL"} onValueChange={handleStatusFilter}>
-                <SelectTrigger className="w-full sm:w-48">
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="Filter by status" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white border border-gray-200 shadow-lg">
                   {statusOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
+                    <SelectItem 
+                      key={option.value} 
+                      value={option.value}
+                      className="hover:bg-gray-100 focus:bg-gray-100"
+                    >
                       {option.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Advanced Filters */}
+            {showAdvancedFilters && (
+              <div className="border-t pt-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 mb-1 block">Min Amount</label>
+                    <Input
+                      type="number"
+                      placeholder="Minimum amount..."
+                      value={minAmountFilter}
+                      onChange={(e) => setMinAmountFilter(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 mb-1 block">Max Amount</label>
+                    <Input
+                      type="number"
+                      placeholder="Maximum amount..."
+                      value={maxAmountFilter}
+                      onChange={(e) => setMaxAmountFilter(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 mb-1 block">Start Date</label>
+                    <Input
+                      type="date"
+                      value={startDateFilter}
+                      onChange={(e) => setStartDateFilter(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 mb-1 block">End Date</label>
+                    <Input
+                      type="date"
+                      value={endDateFilter}
+                      onChange={(e) => setEndDateFilter(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -233,13 +311,12 @@ function DisbursementsContent() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Payee</TableHead>
-                    <TableHead>Particulars</TableHead>
-                    <TableHead>Department</TableHead>
+                    <TableHead className="max-w-xs">Particulars</TableHead>
                     <TableHead>Amount</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Current Reviewer</TableHead>
-                    <TableHead>Requester</TableHead>
-                    <TableHead>Created</TableHead>
+                    <TableHead className="hidden md:table-cell">Current Reviewer</TableHead>
+                    <TableHead className="hidden sm:table-cell">Requester</TableHead>
+                    <TableHead className="hidden lg:table-cell">Created</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -247,16 +324,11 @@ function DisbursementsContent() {
                   {filteredDisbursements.map((disbursement) => (
                     <TableRow key={disbursement.id}>
                       <TableCell>
-                        <div className="font-medium">{disbursement.payee}</div>
+                        <div className="font-medium text-sm">{disbursement.payee}</div>
                       </TableCell>
-                      <TableCell>
-                        <div className="text-sm text-gray-600 max-w-xs truncate">
+                      <TableCell className="max-w-xs">
+                        <div className="text-sm text-gray-600 truncate">
                           {disbursement.particulars}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm text-gray-600">
-                          {disbursement.createdBy.department || "N/A"}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -269,7 +341,7 @@ function DisbursementsContent() {
                           {disbursement.status}
                         </Badge>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden md:table-cell">
                         {(() => {
                           const currentReviewer = getCurrentReviewer(disbursement)
                           return currentReviewer ? (
@@ -285,10 +357,10 @@ function DisbursementsContent() {
                           )
                         })()}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden sm:table-cell">
                         <div className="text-sm">{disbursement.createdBy.name}</div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden lg:table-cell">
                         <div className="text-sm text-gray-600">
                           {formatDate(disbursement.createdAt)}
                         </div>
@@ -297,7 +369,7 @@ function DisbursementsContent() {
                         <Button asChild variant="ghost" size="sm">
                           <Link href={`/disbursements/${disbursement.id}`}>
                             <Eye className="mr-2 h-4 w-4" />
-                            View
+                            <span className="hidden sm:inline">View</span>
                           </Link>
                         </Button>
                       </TableCell>

@@ -34,7 +34,11 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const status = searchParams.get("status") as VoucherStatus | null
-    const department = searchParams.get("department")
+    const searchTerm = searchParams.get("search")
+    const minAmount = searchParams.get("minAmount")
+    const maxAmount = searchParams.get("maxAmount")
+    const startDate = searchParams.get("startDate")
+    const endDate = searchParams.get("endDate")
     const page = parseInt(searchParams.get("page") || "1")
     const limit = parseInt(searchParams.get("limit") || "10")
     const skip = (page - 1) * limit
@@ -47,10 +51,51 @@ export async function GET(request: NextRequest) {
       where.status = status
     }
 
-    // Filter by department if provided
-    if (department) {
-      where.createdBy = {
-        department: department
+    // Filter by search term (payee, particulars, or requester)
+    if (searchTerm) {
+      where.OR = [
+        {
+          payee: {
+            contains: searchTerm,
+            mode: 'insensitive'
+          }
+        },
+        {
+          particulars: {
+            contains: searchTerm,
+            mode: 'insensitive'
+          }
+        },
+        {
+          createdBy: {
+            name: {
+              contains: searchTerm,
+              mode: 'insensitive'
+            }
+          }
+        }
+      ]
+    }
+
+    // Filter by amount range if provided
+    if (minAmount || maxAmount) {
+      where.amount = {}
+      if (minAmount) {
+        where.amount.gte = parseFloat(minAmount)
+      }
+      if (maxAmount) {
+        where.amount.lte = parseFloat(maxAmount)
+      }
+    }
+
+    // Filter by date range if provided
+    if (startDate || endDate) {
+      where.createdAt = {}
+      if (startDate) {
+        where.createdAt.gte = new Date(startDate)
+      }
+      if (endDate) {
+        where.createdAt.lte = new Date(endDate)
       }
     }
 

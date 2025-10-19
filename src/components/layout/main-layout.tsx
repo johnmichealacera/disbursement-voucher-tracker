@@ -52,12 +52,12 @@ const navigation = [
     icon: Plus,
     roles: ["REQUESTER", "ACCOUNTING", "BUDGET", "TREASURY", "MAYOR", "ADMIN", "DEPARTMENT_HEAD", "FINANCE_HEAD", "GSO", "HR", "BAC"]
   },
-  {
-    name: "Reports",
-    href: "/reports",
-    icon: BarChart3,
-    roles: ["ACCOUNTING", "BUDGET", "TREASURY", "MAYOR", "ADMIN", "DEPARTMENT_HEAD", "FINANCE_HEAD", "BAC"]
-  },
+  // {
+  //   name: "Reports",
+  //   href: "/reports",
+  //   icon: BarChart3,
+  //   roles: ["ACCOUNTING", "BUDGET", "TREASURY", "MAYOR", "ADMIN", "DEPARTMENT_HEAD", "FINANCE_HEAD", "BAC"]
+  // },
   {
     name: "User Management",
     href: "/admin/users",
