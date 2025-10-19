@@ -26,6 +26,9 @@ import {
 } from "@/components/ui/select"
 import { formatCurrency, formatDate, getStatusColor, getCurrentReviewer } from "@/lib/utils"
 import { FileText, Plus, Search, Filter, Eye } from "lucide-react"
+import { useDisbursements } from "@/hooks/use-data"
+import { useDebounce } from "@/hooks/use-debounce"
+import { TableSkeleton } from "@/components/ui/skeletons"
 
 interface Disbursement {
   id: string
@@ -76,9 +79,6 @@ function DisbursementsContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   
-  const [disbursements, setDisbursements] = useState<Disbursement[]>([])
-  const [pagination, setPagination] = useState<PaginationInfo | null>(null)
-  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState(searchParams.get("status") || "")
   const [minAmountFilter, setMinAmountFilter] = useState("")
@@ -86,40 +86,29 @@ function DisbursementsContent() {
   const [startDateFilter, setStartDateFilter] = useState("")
   const [endDateFilter, setEndDateFilter] = useState("")
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
 
-  const fetchDisbursements = async (page = 1) => {
-    setLoading(true)
-    try {
-      const params = new URLSearchParams({
-        page: page.toString(),
-        limit: "10"
-      })
-      
-      if (statusFilter) params.append("status", statusFilter)
-      if (searchTerm) params.append("search", searchTerm)
-      if (minAmountFilter) params.append("minAmount", minAmountFilter)
-      if (maxAmountFilter) params.append("maxAmount", maxAmountFilter)
-      if (startDateFilter) params.append("startDate", startDateFilter)
-      if (endDateFilter) params.append("endDate", endDateFilter)
+  // Debounce search term to avoid too many API calls
+  const debouncedSearchTerm = useDebounce(searchTerm, 500)
 
-      const response = await fetch(`/api/disbursements?${params}`)
-      if (response.ok) {
-        const data = await response.json()
-        setDisbursements(data.disbursements)
-        setPagination(data.pagination)
-      }
-    } catch (error) {
-      console.error("Error fetching disbursements:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Build query parameters
+  const queryParams = new URLSearchParams({
+    page: currentPage.toString(),
+    limit: "10"
+  })
+  
+  if (statusFilter) queryParams.append("status", statusFilter)
+  if (debouncedSearchTerm) queryParams.append("search", debouncedSearchTerm)
+  if (minAmountFilter) queryParams.append("minAmount", minAmountFilter)
+  if (maxAmountFilter) queryParams.append("maxAmount", maxAmountFilter)
+  if (startDateFilter) queryParams.append("startDate", startDateFilter)
+  if (endDateFilter) queryParams.append("endDate", endDateFilter)
 
-  useEffect(() => {
-    if (session) {
-      fetchDisbursements()
-    }
-  }, [session, statusFilter, searchTerm, minAmountFilter, maxAmountFilter, startDateFilter, endDateFilter])
+  // Use React Query for data fetching
+  const { data, isLoading, error } = useDisbursements(queryParams)
+
+  const disbursements = data?.disbursements || []
+  const pagination = data?.pagination || null
 
   const handleStatusFilter = (status: string) => {
     const actualStatus = status === "ALL" ? "" : status
@@ -143,7 +132,9 @@ function DisbursementsContent() {
     router.push("/disbursements")
   }
 
-  const filteredDisbursements = disbursements
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+  }
 
   if (!session) {
     return null
@@ -283,11 +274,15 @@ function DisbursementsContent() {
         {/* Disbursements Table */}
         <Card>
           <CardContent className="p-0">
-            {loading ? (
-              <div className="text-center py-8 text-gray-500">
-                Loading disbursements...
+            {isLoading ? (
+              <div className="p-6">
+                <TableSkeleton rows={5} columns={8} />
               </div>
-            ) : filteredDisbursements.length === 0 ? (
+            ) : error ? (
+              <div className="text-center py-8 text-red-500">
+                Error loading disbursements. Please try again.
+              </div>
+            ) : disbursements.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 <FileText className="mx-auto h-12 w-12 text-gray-300 mb-4" />
                 <p className="text-lg font-medium">No disbursements found</p>
@@ -321,7 +316,7 @@ function DisbursementsContent() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredDisbursements.map((disbursement) => (
+                  {disbursements.map((disbursement) => (
                     <TableRow key={disbursement.id}>
                       <TableCell>
                         <div className="font-medium text-sm">{disbursement.payee}</div>
@@ -393,7 +388,7 @@ function DisbursementsContent() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => fetchDisbursements(pagination.page - 1)}
+                onClick={() => handlePageChange(pagination.page - 1)}
                 disabled={pagination.page <= 1}
               >
                 Previous
@@ -401,7 +396,7 @@ function DisbursementsContent() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => fetchDisbursements(pagination.page + 1)}
+                onClick={() => handlePageChange(pagination.page + 1)}
                 disabled={pagination.page >= pagination.pages}
               >
                 Next

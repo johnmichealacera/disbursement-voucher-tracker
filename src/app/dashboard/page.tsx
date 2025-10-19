@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client"
 
-import { useEffect, useState } from "react"
 import { useSession } from "next-auth/react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -15,8 +14,11 @@ import {
   CheckCircle,
   XCircle,
   Banknote,
-  TrendingUp
+  TrendingUp,
+  Plus
 } from "lucide-react"
+import { useDashboardStats, useRecentDisbursements } from "@/hooks/use-data"
+import { DashboardStatsSkeleton, AmountCardsSkeleton, DisbursementListSkeleton } from "@/components/ui/skeletons"
 
 interface DashboardStats {
   totalVouchers: number
@@ -63,52 +65,8 @@ interface RecentVoucher {
 
 export default function DashboardPage() {
   const { data: session } = useSession()
-  const [stats, setStats] = useState<DashboardStats | null>(null)
-  const [recentVouchers, setRecentVouchers] = useState<RecentVoucher[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        // Fetch recent disbursements
-        const response = await fetch("/api/disbursements?limit=5")
-        if (response.ok) {
-          const data = await response.json()
-          setRecentVouchers(data.disbursements)
-          
-          // Calculate stats from the data
-          const totalVouchers = data.pagination.total
-          const pending = data.disbursements.filter((v: any) => v.status === "PENDING").length
-          const approved = data.disbursements.filter((v: any) => v.status === "APPROVED" || v.status === "RELEASED").length
-          const rejected = data.disbursements.filter((v: any) => v.status === "REJECTED").length
-          const totalAmount = data.disbursements.reduce((sum: number, v: any) => sum + parseFloat(v.amount), 0)
-          
-          // For monthly amount, we'd need a separate API call or filter by date
-          const currentMonth = new Date().getMonth()
-          const monthlyAmount = data.disbursements
-            .filter((v: any) => new Date(v.createdAt).getMonth() === currentMonth)
-            .reduce((sum: number, v: any) => sum + parseFloat(v.amount), 0)
-
-          setStats({
-            totalVouchers,
-            pendingVouchers: pending,
-            approvedVouchers: approved,
-            rejectedVouchers: rejected,
-            totalAmount,
-            monthlyAmount
-          })
-        }
-      } catch (error) {
-        console.error("Error fetching dashboard data:", error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    if (session) {
-      fetchDashboardData()
-    }
-  }, [session])
+  const { data: stats, isLoading: statsLoading, error: statsError } = useDashboardStats()
+  const { data: recentVouchers, isLoading: recentLoading, error: recentError } = useRecentDisbursements()
 
   if (!session) {
     return null
@@ -186,50 +144,58 @@ export default function DashboardPage() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {statCards.map((card) => (
-            <Card key={card.title}>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">
-                      {card.title}
-                    </p>
-                    <p className="text-2xl font-bold text-gray-900">
-                      {loading ? "..." : card.value}
-                    </p>
+        {statsLoading ? (
+          <DashboardStatsSkeleton />
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {statCards.map((card) => (
+              <Card key={card.title}>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">
+                        {card.title}
+                      </p>
+                      <p className="text-2xl font-bold text-gray-900">
+                        {card.value}
+                      </p>
+                    </div>
+                    <div className={`p-3 rounded-full ${card.bgColor}`}>
+                      <card.icon className={`h-6 w-6 ${card.color}`} />
+                    </div>
                   </div>
-                  <div className={`p-3 rounded-full ${card.bgColor}`}>
-                    <card.icon className={`h-6 w-6 ${card.color}`} />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
 
         {/* Amount Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {amountCards.map((card) => (
-            <Card key={card.title}>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">
-                      {card.title}
-                    </p>
-                    <p className="text-2xl font-bold text-gray-900">
-                      {loading ? "..." : card.value}
-                    </p>
+        {statsLoading ? (
+          <AmountCardsSkeleton />
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {amountCards.map((card) => (
+              <Card key={card.title}>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">
+                        {card.title}
+                      </p>
+                      <p className="text-2xl font-bold text-gray-900">
+                        {card.value}
+                      </p>
+                    </div>
+                    <div className={`p-3 rounded-full ${card.bgColor}`}>
+                      <card.icon className={`h-6 w-6 ${card.color}`} />
+                    </div>
                   </div>
-                  <div className={`p-3 rounded-full ${card.bgColor}`}>
-                    <card.icon className={`h-6 w-6 ${card.color}`} />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
 
         {/* Recent Vouchers */}
         <Card>
@@ -247,17 +213,31 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent>
-            {loading ? (
-              <div className="text-center py-8 text-gray-500">
-                Loading recent vouchers...
+            {recentLoading ? (
+              <DisbursementListSkeleton />
+            ) : recentError ? (
+              <div className="text-center py-8 text-red-500">
+                Error loading recent vouchers. Please try again.
               </div>
-            ) : recentVouchers.length === 0 ? (
+            ) : recentVouchers && recentVouchers.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
-                No vouchers found
+                <FileText className="mx-auto h-12 w-12 text-gray-300 mb-4" />
+                <p className="text-lg font-medium">No vouchers found</p>
+                <p className="text-sm">
+                  {session.user.role === "REQUESTER" && "Create your first disbursement voucher to get started."}
+                </p>
+                {session.user.role === "REQUESTER" && (
+                  <Button asChild className="mt-4">
+                    <Link href="/create">
+                      <Plus className="mr-2 h-4 w-4" />
+                      Create New Voucher
+                    </Link>
+                  </Button>
+                )}
               </div>
             ) : (
               <div className="space-y-4">
-                {recentVouchers.map((voucher) => (
+                {recentVouchers?.map((voucher) => (
                   <div
                     key={voucher.id}
                     className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors gap-4"

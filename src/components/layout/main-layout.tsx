@@ -29,6 +29,7 @@ import {
 } from "lucide-react"
 import { NotificationBell } from "@/components/notifications/notification-bell"
 import Footer from "./footer"
+import { PerformanceMonitor } from "../performance-monitor"
 
 interface MainLayoutProps {
   children: React.ReactNode
@@ -261,6 +262,8 @@ export function MainLayout({ children }: MainLayoutProps) {
         
         {/* Footer */}
         <Footer />
+        {/* Performance Monitor (Development Only) */}
+        <PerformanceMonitor />
       </div>
     </div>
   )

@@ -152,30 +152,27 @@ export async function GET(request: NextRequest) {
     const [disbursements, total] = await Promise.all([
       prisma.disbursementVoucher.findMany({
         where,
-        include: {
+        select: {
+          id: true,
+          payee: true,
+          particulars: true,
+          amount: true,
+          status: true,
+          createdAt: true,
           createdBy: {
             select: {
               id: true,
               name: true,
-              email: true,
               department: true,
               role: true
             }
           },
-          assignedTo: {
-            select: {
-              id: true,
-              name: true,
-              email: true
-            }
-          },
-          items: true,
-          attachments: true,
           approvals: {
-            include: {
+            select: {
+              level: true,
+              status: true,
               approver: {
                 select: {
-                  id: true,
                   name: true,
                   role: true
                 }
@@ -183,10 +180,9 @@ export async function GET(request: NextRequest) {
             }
           },
           bacReviews: {
-            include: {
+            select: {
               reviewer: {
                 select: {
-                  id: true,
                   name: true,
                   role: true
                 }
@@ -194,11 +190,10 @@ export async function GET(request: NextRequest) {
             }
           },
           auditTrails: {
-            include: {
+            select: {
+              action: true,
               user: {
                 select: {
-                  id: true,
-                  name: true,
                   role: true
                 }
               }

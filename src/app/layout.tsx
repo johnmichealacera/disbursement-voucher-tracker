@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { Providers } from "@/components/providers/session-provider";
+import { ReactQueryProvider } from "@/lib/react-query";
 import "./globals.css";
 
 const inter = Inter({
@@ -21,9 +22,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.variable} font-sans antialiased`}>
-        <Providers>
-          {children}
-        </Providers>
+        <ReactQueryProvider>
+          <Providers>
+            {children}
+          </Providers>
+        </ReactQueryProvider>
       </body>
     </html>
   );
