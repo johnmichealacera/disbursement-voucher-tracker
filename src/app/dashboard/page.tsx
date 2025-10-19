@@ -166,19 +166,19 @@ export default function DashboardPage() {
     <MainLayout>
       <div className="p-6 space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
             <p className="text-gray-600">
               Welcome back, {session.user.name}
             </p>
           </div>
-          <div className="flex items-center space-x-3">
-            <Badge variant="outline" className="px-3 py-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="outline" className="px-3 py-1 text-xs">
               {session.user.role.replace("_", " ")}
             </Badge>
             {session.user.department && (
-              <Badge variant="secondary" className="px-3 py-1">
+              <Badge variant="secondary" className="px-3 py-1 text-xs">
                 {session.user.department}
               </Badge>
             )}
@@ -186,7 +186,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {statCards.map((card) => (
             <Card key={card.title}>
               <CardContent className="p-6">
@@ -209,7 +209,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Amount Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {amountCards.map((card) => (
             <Card key={card.title}>
               <CardContent className="p-6">
@@ -260,7 +260,7 @@ export default function DashboardPage() {
                 {recentVouchers.map((voucher) => (
                   <div
                     key={voucher.id}
-                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
+                    className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors gap-4"
                   >
                     <div className="flex-1">
                       <div className="flex items-start space-x-3">
@@ -268,22 +268,17 @@ export default function DashboardPage() {
                           <FileText className="h-5 w-5 text-gray-400" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          <div className="space-y-2">
                             <div>
                               <p className="text-sm font-medium text-gray-900">
                                 <span className="text-gray-600">Payee:</span> {voucher.payee}
                               </p>
-                              <p className="text-sm text-gray-600 mt-1">
-                                <span className="text-gray-500">Department:</span> {voucher.createdBy.department || "N/A"}
-                              </p>
-                            </div>
-                            <div>
                               <p className="text-sm text-gray-600">
                                 <span className="text-gray-500">Particulars:</span> {voucher.particulars}
                               </p>
-                              <p className="text-sm text-gray-500 mt-1">
-                                <span className="text-gray-400">Created by:</span> {voucher.createdBy.name} • {formatDate(voucher.createdAt)}
-                              </p>
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              <span className="text-gray-400">Created by:</span> {voucher.createdBy.name} • {formatDate(voucher.createdAt)}
                             </div>
                           </div>
                           {/* Current Reviewer Information */}
@@ -304,15 +299,15 @@ export default function DashboardPage() {
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-4">
+                    <div className="flex items-center justify-between sm:justify-end sm:space-x-4">
                       <div className="text-right">
                         <p className="text-sm font-medium text-gray-900">
                           {formatCurrency(voucher.amount)}
                         </p>
+                        <Badge className={getStatusColor(voucher.status)}>
+                          {voucher.status}
+                        </Badge>
                       </div>
-                      <Badge className={getStatusColor(voucher.status)}>
-                        {voucher.status}
-                      </Badge>
                       <Button asChild variant="ghost" size="sm">
                         <Link href={`/disbursements/${voucher.id}`}>
                           View
@@ -336,14 +331,14 @@ export default function DashboardPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="flex space-x-4">
-                <Button asChild>
+              <div className="flex flex-col sm:flex-row gap-4">
+                <Button asChild className="w-full sm:w-auto">
                   <Link href="/create">
                     <FileText className="mr-2 h-4 w-4" />
                     Create New Voucher
                   </Link>
                 </Button>
-                <Button asChild variant="outline">
+                <Button asChild variant="outline" className="w-full sm:w-auto">
                   <Link href="/disbursements?status=DRAFT">
                     View Draft Vouchers
                   </Link>

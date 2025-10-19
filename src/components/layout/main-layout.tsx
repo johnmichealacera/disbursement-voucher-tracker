@@ -28,6 +28,7 @@ import {
   Settings
 } from "lucide-react"
 import { NotificationBell } from "@/components/notifications/notification-bell"
+import Footer from "./footer"
 
 interface MainLayoutProps {
   children: React.ReactNode
@@ -257,6 +258,9 @@ export function MainLayout({ children }: MainLayoutProps) {
         <main className="flex-1 overflow-auto">
           {children}
         </main>
+        
+        {/* Footer */}
+        <Footer />
       </div>
     </div>
   )
