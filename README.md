@@ -47,6 +47,11 @@ A comprehensive, transparent, and efficient disbursement tracking system designe
 - **Responsive Design**: Mobile-friendly interface with modern UI components
 - **Philippine Peso Support**: All currency displays use Philippine Peso (₱) formatting
 - **Enhanced Profile UI**: Beautiful user profile dropdown with improved visibility and styling
+- **User Profile Management**: Comprehensive profile page with user information display
+- **Password Management**: Secure password change functionality with validation
+- **Activity Logging**: Complete user activity tracking with detailed audit trails
+- **Enhanced Notifications**: Improved notification bell modal with better visibility and styling
+- **Canvas Item Support**: Flexible canvas-based item management for disbursements
 
 ## 🛠️ Tech Stack
 
@@ -54,9 +59,10 @@ A comprehensive, transparent, and efficient disbursement tracking system designe
 - **Next.js 14**: React framework with App Router
 - **TypeScript**: Type-safe development
 - **Tailwind CSS**: Utility-first CSS framework
-- **ShadCN/UI**: Modern component library
+- **ShadCN/UI**: Modern component library with Radix UI primitives
 - **React Hook Form**: Form management with validation
 - **Zod**: Schema validation
+- **Radix UI**: Accessible UI primitives (ScrollArea, Dialog, etc.)
 
 ### Backend
 - **Next.js API Routes**: Serverless API endpoints

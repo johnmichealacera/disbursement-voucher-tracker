@@ -233,13 +233,11 @@ export function MainLayout({ children }: MainLayoutProps) {
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator className="my-2" />
-                  <DropdownMenuItem className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 rounded-md transition-colors cursor-pointer">
-                    <User className="mr-3 h-4 w-4" />
-                    <span>Profile</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 rounded-md transition-colors cursor-pointer">
-                    <Settings className="mr-3 h-4 w-4" />
-                    <span>Settings</span>
+                  <DropdownMenuItem asChild>
+                    <Link href="/profile" className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 rounded-md transition-colors cursor-pointer">
+                      <User className="mr-3 h-4 w-4" />
+                      <span>Profile</span>
+                    </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator className="my-2" />
                   <DropdownMenuItem

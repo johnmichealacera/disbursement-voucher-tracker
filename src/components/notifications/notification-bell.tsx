@@ -109,11 +109,11 @@ export function NotificationBell() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent 
-        className="w-96 max-h-96 overflow-y-auto" 
+        className="w-96 max-h-96 overflow-y-auto bg-white border border-gray-200 shadow-xl rounded-lg" 
         align="end" 
         forceMount
       >
-        <div className="p-4">
+        <div className="p-4 bg-white">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-semibold text-gray-900">Notifications</h3>
             <div className="flex items-center space-x-2">
