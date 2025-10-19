@@ -45,6 +45,13 @@ enum PaymentMethod {
   E_TRANSFER
 }
 
+enum CanvasItemType {
+  VOUCHER
+  ITEM
+  NOTE
+  ATTACHMENT
+}
+
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -66,6 +73,7 @@ model User {
   bacReviews          BacReview[]
   accounts            Account[]
   sessions            Session[]
+  canvasItems         CanvasItem[]
 
   @@map("users")
 }
@@ -99,6 +107,7 @@ model DisbursementVoucher {
   auditTrails   AuditTrail[]
   notifications Notification[]
   bacReviews    BacReview[]
+  canvasItems   CanvasItem[]
 
   @@map("disbursement_vouchers")
 }
@@ -118,6 +127,7 @@ model DisbursementItem {
 
   // Relations
   disbursementVoucher DisbursementVoucher @relation(fields: [disbursementVoucherId], references: [id], onDelete: Cascade)
+  canvasItems         CanvasItem[]
 
   @@map("disbursement_items")
 }
