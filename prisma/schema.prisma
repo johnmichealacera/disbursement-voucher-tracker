@@ -263,6 +263,29 @@ model Session {
   @@map("sessions")
 }
 
+model CanvasItem {
+  id          String          @id @default(cuid())
+  type        CanvasItemType
+  content     String
+  position    Json? // For storing x, y coordinates
+  size        Json? // For storing width, height
+  metadata    Json? // For storing additional properties
+  
+  userId                String?
+  disbursementVoucherId String?
+  disbursementItemId    String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user                User?                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  disbursementVoucher DisbursementVoucher? @relation(fields: [disbursementVoucherId], references: [id], onDelete: Cascade)
+  disbursementItem    DisbursementItem?    @relation(fields: [disbursementItemId], references: [id], onDelete: Cascade)
+
+  @@map("canvas_items")
+}
+
 model VerificationToken {
   identifier String
   token      String   @unique
