@@ -86,6 +86,8 @@ export function getRoleDisplayName(role: string): string {
       return 'Human Resources'
     case 'BAC':
       return 'Bids and Awards Committee'
+    case 'SECRETARY':
+      return 'Secretary'
     default:
       return role
   }
@@ -114,9 +116,22 @@ export function getCurrentReviewer(disbursement: any): { role: string; displayNa
 
   // For GSO workflow
   if (createdBy.role === 'GSO') {
+    // Check if Secretary has reviewed
+    const secretaryApproved = approvals.some((approval: any) => 
+      approval.level === 1 && approval.status === 'APPROVED'
+    )
+    
+    if (!secretaryApproved) {
+      return {
+        role: 'SECRETARY',
+        displayName: 'Secretary',
+        status: 'Awaiting Secretary Review'
+      }
+    }
+
     // Check if Mayor has reviewed
     const mayorApproved = approvals.some((approval: any) => 
-      approval.level === 1 && approval.status === 'APPROVED'
+      approval.level === 2 && approval.status === 'APPROVED'
     )
     
     if (!mayorApproved) {
@@ -139,7 +154,7 @@ export function getCurrentReviewer(disbursement: any): { role: string; displayNa
 
     // Check Budget approval
     const budgetApproved = approvals.some((approval: any) => 
-      approval.level === 3 && approval.status === 'APPROVED'
+      approval.level === 4 && approval.status === 'APPROVED'
     )
     
     if (!budgetApproved) {
@@ -152,7 +167,7 @@ export function getCurrentReviewer(disbursement: any): { role: string; displayNa
 
     // Check Accounting approval
     const accountingApproved = approvals.some((approval: any) => 
-      approval.level === 4 && approval.status === 'APPROVED'
+      approval.level === 5 && approval.status === 'APPROVED'
     )
     
     if (!accountingApproved) {
@@ -198,9 +213,22 @@ export function getCurrentReviewer(disbursement: any): { role: string; displayNa
   }
 
   // For Standard workflow (non-GSO)
+  // Check Secretary approval
+  const secretaryApproved = approvals.some((approval: any) => 
+    approval.level === 1 && approval.status === 'APPROVED'
+  )
+  
+  if (!secretaryApproved) {
+    return {
+      role: 'SECRETARY',
+      displayName: 'Secretary',
+      status: 'Awaiting Secretary Review'
+    }
+  }
+
   // Check Mayor approval
   const mayorApproved = approvals.some((approval: any) => 
-    approval.level === 1 && approval.status === 'APPROVED'
+    approval.level === 2 && approval.status === 'APPROVED'
   )
   
   if (!mayorApproved) {
@@ -213,7 +241,7 @@ export function getCurrentReviewer(disbursement: any): { role: string; displayNa
 
   // Check Budget approval
   const budgetApproved = approvals.some((approval: any) => 
-    approval.level === 2 && approval.status === 'APPROVED'
+    approval.level === 3 && approval.status === 'APPROVED'
   )
   
   if (!budgetApproved) {
@@ -226,7 +254,7 @@ export function getCurrentReviewer(disbursement: any): { role: string; displayNa
 
   // Check Accounting approval
   const accountingApproved = approvals.some((approval: any) => 
-    approval.level === 3 && approval.status === 'APPROVED'
+    approval.level === 4 && approval.status === 'APPROVED'
   )
   
   if (!accountingApproved) {

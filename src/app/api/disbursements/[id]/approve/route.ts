@@ -14,42 +14,60 @@ const approvalSchema = z.object({
 
 // Define approval levels and required roles
 const APPROVAL_LEVELS = {
-  1: ["MAYOR"],
-  2: ["BUDGET"], // Budget for standard workflow, BAC for GSO workflow (handled separately)
-  3: ["ACCOUNTING"], // Accounting for standard workflow, Budget for GSO workflow
-  4: ["TREASURY"], // Treasury for standard workflow, Accounting for GSO workflow
-  5: ["ADMIN"] // Admin for both workflows, Treasury for GSO workflow
+  1: ["SECRETARY"], // Secretary is now Level 1 for both workflows
+  2: ["MAYOR"], // Mayor is now Level 2
+  3: ["BUDGET"], // Budget for standard workflow, BAC for GSO workflow (handled separately)
+  4: ["ACCOUNTING"], // Accounting for standard workflow, Budget for GSO workflow
+  5: ["TREASURY"], // Treasury for standard workflow, Accounting for GSO workflow
+  6: ["ADMIN"] // Admin for both workflows, Treasury for GSO workflow
 }
 
 function getApprovalLevel(role: UserRole, disbursementRole?: string): number | null {
   // Handle GSO workflow
   if (disbursementRole === "GSO") {
     switch (role) {
-      case "MAYOR": return 1
-      case "BUDGET": return 3 // Budget is Level 3 in GSO workflow
-      case "ACCOUNTING": return 4 // Accounting is Level 4 in GSO workflow
-      case "TREASURY": return 5 // Treasury is Level 5 in GSO workflow
+      case "SECRETARY": return 1 // Secretary is Level 1 for GSO workflow
+      case "MAYOR": return 2 // Mayor is Level 2 for GSO workflow
+      case "BUDGET": return 4 // Budget is Level 4 in GSO workflow (after BAC)
+      case "ACCOUNTING": return 5 // Accounting is Level 5 in GSO workflow
+      case "TREASURY": return 6 // Treasury is Level 6 in GSO workflow
       default: return null
     }
   }
   
   // Handle standard workflow (non-GSO)
-  for (const [level, roles] of Object.entries(APPROVAL_LEVELS)) {
-    if (roles.includes(role)) {
-      return parseInt(level)
-    }
+  switch (role) {
+    case "SECRETARY": return 1 // Secretary is Level 1 for standard workflow
+    case "MAYOR": return 2 // Mayor is Level 2 for standard workflow
+    case "BUDGET": return 3 // Budget is Level 3 for standard workflow
+    case "ACCOUNTING": return 4 // Accounting is Level 4 for standard workflow
+    case "TREASURY": return 5 // Treasury is Level 5 for standard workflow
+    default: return null
   }
-  return null
 }
 
-function getNextVoucherStatus(level: number, approved: boolean): VoucherStatus {
+function getNextVoucherStatus(level: number, approved: boolean, disbursementRole?: string): VoucherStatus {
   if (!approved) return "REJECTED"
   
+  // Handle GSO workflow
+  if (disbursementRole === "GSO") {
+    switch (level) {
+      case 1: return "PENDING" // Secretary approval - moves to next level
+      case 2: return "PENDING" // Mayor approval - moves to next level
+      case 4: return "PENDING" // Budget approval - moves to next level
+      case 5: return "PENDING" // Accounting approval - moves to next level
+      case 6: return "RELEASED" // Treasury approval - final release
+      default: return "PENDING"
+    }
+  }
+  
+  // Handle standard workflow (non-GSO)
   switch (level) {
-    case 1: return "PENDING" // Mayor approval - moves to next level
-    case 2: return "PENDING" // Budget approval - moves to next level
-    case 3: return "PENDING" // Accounting approval - moves to next level
-    case 4: return "RELEASED" // Treasury approval - final release
+    case 1: return "PENDING" // Secretary approval - moves to next level
+    case 2: return "PENDING" // Mayor approval - moves to next level
+    case 3: return "PENDING" // Budget approval - moves to next level
+    case 4: return "PENDING" // Accounting approval - moves to next level
+    case 5: return "RELEASED" // Treasury approval - final release
     default: return "PENDING"
   }
 }
@@ -112,13 +130,85 @@ export async function POST(
 
     // Check if previous levels are approved (except for level 1)
     if (userApprovalLevel > 1) {
-      const previousLevels = Array.from({ length: userApprovalLevel - 1 }, (_, i) => i + 1)
-      const previousApprovals = disbursement.approvals.filter(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (approval: any) => previousLevels.includes(approval.level) && approval.status === "APPROVED"
-      )
+      let previousLevelsCompleted = false
       
-      if (previousApprovals.length !== previousLevels.length) {
+      // For GSO workflow, handle special cases
+      if (disbursement.createdBy.role === "GSO") {
+        if (userApprovalLevel === 4) {
+          // Budget (Level 4) needs: Secretary (Level 1), Mayor (Level 2), and BAC (3+ reviews)
+          const secretaryApproved = disbursement.approvals.some(approval => 
+            approval.level === 1 && approval.status === "APPROVED"
+          )
+          const mayorApproved = disbursement.approvals.some(approval => 
+            approval.level === 2 && approval.status === "APPROVED"
+          )
+          
+          // Check BAC reviews
+          const bacReviewCount = await prisma.bacReview.count({
+            where: { disbursementVoucherId: id }
+          })
+          const bacCompleted = bacReviewCount >= 3
+          
+          previousLevelsCompleted = secretaryApproved && mayorApproved && bacCompleted
+        } else if (userApprovalLevel === 5) {
+          // Accounting (Level 5) needs: Secretary (Level 1), Mayor (Level 2), BAC (3+ reviews), Budget (Level 4)
+          const secretaryApproved = disbursement.approvals.some(approval => 
+            approval.level === 1 && approval.status === "APPROVED"
+          )
+          const mayorApproved = disbursement.approvals.some(approval => 
+            approval.level === 2 && approval.status === "APPROVED"
+          )
+          const budgetApproved = disbursement.approvals.some(approval => 
+            approval.level === 4 && approval.status === "APPROVED"
+          )
+          
+          const bacReviewCount = await prisma.bacReview.count({
+            where: { disbursementVoucherId: id }
+          })
+          const bacCompleted = bacReviewCount >= 3
+          
+          previousLevelsCompleted = secretaryApproved && mayorApproved && bacCompleted && budgetApproved
+        } else if (userApprovalLevel === 6) {
+          // Treasury (Level 6) needs: Secretary (Level 1), Mayor (Level 2), BAC (3+ reviews), Budget (Level 4), Accounting (Level 5)
+          const secretaryApproved = disbursement.approvals.some(approval => 
+            approval.level === 1 && approval.status === "APPROVED"
+          )
+          const mayorApproved = disbursement.approvals.some(approval => 
+            approval.level === 2 && approval.status === "APPROVED"
+          )
+          const budgetApproved = disbursement.approvals.some(approval => 
+            approval.level === 4 && approval.status === "APPROVED"
+          )
+          const accountingApproved = disbursement.approvals.some(approval => 
+            approval.level === 5 && approval.status === "APPROVED"
+          )
+          
+          const bacReviewCount = await prisma.bacReview.count({
+            where: { disbursementVoucherId: id }
+          })
+          const bacCompleted = bacReviewCount >= 3
+          
+          previousLevelsCompleted = secretaryApproved && mayorApproved && bacCompleted && budgetApproved && accountingApproved
+        } else {
+          // For other levels in GSO workflow, check approval records normally
+          const previousLevels = Array.from({ length: userApprovalLevel - 1 }, (_, i) => i + 1)
+          const previousApprovals = disbursement.approvals.filter(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (approval: any) => previousLevels.includes(approval.level) && approval.status === "APPROVED"
+          )
+          previousLevelsCompleted = previousApprovals.length === previousLevels.length
+        }
+      } else {
+        // For non-GSO workflow, check approval records normally
+        const previousLevels = Array.from({ length: userApprovalLevel - 1 }, (_, i) => i + 1)
+        const previousApprovals = disbursement.approvals.filter(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (approval: any) => previousLevels.includes(approval.level) && approval.status === "APPROVED"
+        )
+        previousLevelsCompleted = previousApprovals.length === previousLevels.length
+      }
+      
+      if (!previousLevelsCompleted) {
         return NextResponse.json({ error: "Previous approval levels are not completed" }, { status: 400 })
       }
     }
@@ -145,7 +235,7 @@ export async function POST(
     })
 
     // Update disbursement status
-    const newStatus = getNextVoucherStatus(userApprovalLevel, validatedData.status === "APPROVED")
+    const newStatus = getNextVoucherStatus(userApprovalLevel, validatedData.status === "APPROVED", disbursement.createdBy.role)
     
     const updatedDisbursement = await prisma.disbursementVoucher.update({
       where: { id },

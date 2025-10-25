@@ -332,6 +332,67 @@ export default function DisbursementDetailPage() {
     }
   }
 
+  const handleSecretaryReview = async () => {
+    if (!disbursement) return
+
+    setIsApproving(true)
+    setError("")
+
+    try {
+      console.log(`Starting Secretary review for disbursement: ${id}`)
+      
+      // Proceed with Secretary review with timeout
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+      
+      const response = await fetch(`/api/disbursements/${id}/secretary-review`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "SECRETARY_REVIEWED",
+          remarks: reviewPassword.trim() || undefined // Use password field as remarks for now
+        }),
+        signal: controller.signal
+      })
+      
+      clearTimeout(timeoutId)
+
+      console.log(`Secretary review response status: ${response.status}`)
+
+      if (response.ok) {
+        const updatedDisbursement = await response.json()
+        console.log(`Secretary review successful, updating disbursement:`, updatedDisbursement)
+        setDisbursement(updatedDisbursement)
+        setShowReviewDialog(false)
+        setReviewPassword("")
+        
+        // Force refresh the page to ensure UI updates
+        setTimeout(() => {
+          window.location.reload()
+        }, 1000)
+        
+        console.log(`Secretary review completed successfully`)
+      } else {
+        const errorData = await response.json()
+        console.error(`Secretary review failed:`, errorData)
+        setError(errorData.error || "Failed to Secretary review voucher")
+      }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (error: any) {
+      console.error("Error Secretary reviewing disbursement:", error)
+      if (error.name === 'AbortError') {
+        setError("Request timed out. Please try again.")
+      } else {
+        setError("Failed to Secretary review voucher")
+      }
+    } finally {
+      setIsApproving(false)
+      console.log(`Secretary review process finished`)
+    }
+  }
+
   const handleReview = async () => {
     if (!disbursement) return
 
@@ -509,14 +570,15 @@ export default function DisbursementDetailPage() {
         return
       }
 
-      // If password is valid, proceed with Accounting review using standard approval API
-      const response = await fetch(`/api/disbursements/${id}/approve`, {
+      // If password is valid, proceed with Accounting review using dedicated API
+      const response = await fetch(`/api/disbursements/${id}/accounting-review`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          status: "APPROVED"
+          action: "ACCOUNTING_REVIEWED",
+          comments: reviewPassword.trim() || undefined
         }),
       })
 
@@ -805,10 +867,11 @@ export default function DisbursementDetailPage() {
   // Determine approval permissions based on role and current status
   const getApprovalLevel = (role: string): number | null => {
     switch (role) {
-      case "DEPARTMENT_HEAD": return 1
-      case "FINANCE_HEAD":
-      case "ACCOUNTING": return 2
-      case "MAYOR": return 3
+      case "SECRETARY": return 1
+      case "MAYOR": return 2
+      case "BUDGET": return disbursement?.createdBy?.role === "GSO" ? 4 : 3
+      case "ACCOUNTING": return disbursement?.createdBy?.role === "GSO" ? 5 : 4
+      case "TREASURY": return disbursement?.createdBy?.role === "GSO" ? 6 : 5
       default: return null
     }
   }
@@ -821,7 +884,8 @@ export default function DisbursementDetailPage() {
     if (!isAdmin) return null
     
     // Find the next level that needs approval
-    for (let level = 1; level <= 3; level++) {
+    const maxLevel = disbursement?.createdBy?.role === "GSO" ? 6 : 5
+    for (let level = 1; level <= maxLevel; level++) {
       const hasApprovalAtLevel = disbursement.approvals && disbursement.approvals.some(approval => 
         approval.level === level && approval.status === "APPROVED"
       )
@@ -842,21 +906,87 @@ export default function DisbursementDetailPage() {
       approval.approver.id === session.user.id && approval.level === effectiveApprovalLevel
     ) &&
     // Exclude roles that have their own specific review buttons
-    !["ACCOUNTING", "BUDGET", "BAC", "MAYOR"].includes(session.user.role)
+    !["ACCOUNTING", "BUDGET", "BAC", "MAYOR", "SECRETARY"].includes(session.user.role)
 
   // Check if previous levels are completed (for levels > 1)
   const previousLevelsCompleted = effectiveApprovalLevel === 1 || 
     (effectiveApprovalLevel && effectiveApprovalLevel > 1 && 
      disbursement.approvals && // Add null check
-     Array.from({ length: effectiveApprovalLevel - 1 }, (_, i) => i + 1)
-       .every(level => 
-         disbursement.approvals.some(approval => 
-           approval.level === level && approval.status === "APPROVED"
+     (() => {
+       // For GSO workflow, handle special cases
+       if (disbursement?.createdBy?.role === "GSO") {
+         if (effectiveApprovalLevel === 4) {
+           // Budget (Level 4) needs: Secretary (Level 1), Mayor (Level 2), and BAC (3+ reviews)
+           const secretaryApproved = disbursement.approvals.some(approval => 
+             approval.level === 1 && approval.status === "APPROVED"
+           )
+           const mayorApproved = disbursement.approvals.some(approval => 
+             approval.level === 2 && approval.status === "APPROVED"
+           )
+           const bacCompleted = disbursement.bacReviews && disbursement.bacReviews.length >= 3
+           
+           return secretaryApproved && mayorApproved && bacCompleted
+         } else if (effectiveApprovalLevel === 5) {
+           // Accounting (Level 5) needs: Secretary (Level 1), Mayor (Level 2), BAC (3+ reviews), Budget (Level 4)
+           const secretaryApproved = disbursement.approvals.some(approval => 
+             approval.level === 1 && approval.status === "APPROVED"
+           )
+           const mayorApproved = disbursement.approvals.some(approval => 
+             approval.level === 2 && approval.status === "APPROVED"
+           )
+           const bacCompleted = disbursement.bacReviews && disbursement.bacReviews.length >= 3
+           const budgetApproved = disbursement.approvals.some(approval => 
+             approval.level === 4 && approval.status === "APPROVED"
+           )
+           
+           return secretaryApproved && mayorApproved && bacCompleted && budgetApproved
+         } else if (effectiveApprovalLevel === 6) {
+           // Treasury (Level 6) needs: Secretary (Level 1), Mayor (Level 2), BAC (3+ reviews), Budget (Level 4), Accounting (Level 5)
+           const secretaryApproved = disbursement.approvals.some(approval => 
+             approval.level === 1 && approval.status === "APPROVED"
+           )
+           const mayorApproved = disbursement.approvals.some(approval => 
+             approval.level === 2 && approval.status === "APPROVED"
+           )
+           const bacCompleted = disbursement.bacReviews && disbursement.bacReviews.length >= 3
+           const budgetApproved = disbursement.approvals.some(approval => 
+             approval.level === 4 && approval.status === "APPROVED"
+           )
+           const accountingApproved = disbursement.approvals.some(approval => 
+             approval.level === 5 && approval.status === "APPROVED"
+           )
+           
+           return secretaryApproved && mayorApproved && bacCompleted && budgetApproved && accountingApproved
+         }
+       }
+       
+       // For all other cases, check approval records normally
+       return Array.from({ length: effectiveApprovalLevel - 1 }, (_, i) => i + 1)
+         .every(level => 
+           disbursement.approvals.some(approval => 
+             approval.level === level && approval.status === "APPROVED"
+           )
          )
-       )
+     })()
     )
 
   const canApproveNow = canApprove && previousLevelsCompleted
+
+  // Secretary review logic
+  const canSecretaryReview = session.user.role === "SECRETARY" && 
+    disbursement && 
+    ["PENDING"].includes(disbursement.status) &&
+    disbursement.approvals && // Add null check
+    !disbursement.approvals.some(approval => 
+      approval.level === 1 && approval.status === "APPROVED"
+    )
+
+  // Check if Secretary has already reviewed this voucher
+  const secretaryHasReviewed = disbursement && 
+    disbursement.approvals && // Add null check
+    disbursement.approvals.some(approval => 
+      approval.level === 1 && approval.status === "APPROVED"
+    )
 
   // Mayor review logic
   const canMayorReview = session.user.role === "MAYOR" && 
@@ -864,15 +994,18 @@ export default function DisbursementDetailPage() {
     ["GSO", "HR", "REQUESTER"].includes(disbursement?.createdBy?.role) &&
     ["PENDING"].includes(disbursement.status) &&
     disbursement.approvals && // Add null check
+    disbursement.approvals.some(approval => 
+      approval.level === 1 && approval.status === "APPROVED" // Secretary must have approved first
+    ) &&
     !disbursement.approvals.some(approval => 
-      approval.level === 1 && approval.status === "APPROVED"
+      approval.level === 2 && approval.status === "APPROVED"
     )
 
   // Check if Mayor has already reviewed this voucher
   const mayorHasReviewed = disbursement && 
     disbursement.approvals && // Add null check
     disbursement.approvals.some(approval => 
-      approval.level === 1 && approval.status === "APPROVED"
+      approval.level === 2 && approval.status === "APPROVED"
     )
 
   // Check if Mayor has reviewed this GSO voucher (using approval levels OR audit trails)
@@ -880,7 +1013,7 @@ export default function DisbursementDetailPage() {
     disbursement?.createdBy?.role === "GSO" &&
     disbursement.approvals && // Add null check
     disbursement.approvals.some(approval => 
-      approval.level === 1 && approval.status === "APPROVED"
+      approval.level === 2 && approval.status === "APPROVED"
     )
     
   const mayorHasReviewedGsoByAudit = disbursement && 
@@ -945,23 +1078,33 @@ export default function DisbursementDetailPage() {
     disbursement && 
     ["PENDING"].includes(disbursement.status) &&
     disbursement.approvals && // Add null check
+    // Check for Secretary approval (Level 1) and Mayor approval (Level 2)
     disbursement.approvals.some(approval => 
-      approval.level === 1 && approval.status === "APPROVED" // Mayor approval
+      approval.level === 1 && approval.status === "APPROVED" // Secretary approval
+    ) &&
+    disbursement.approvals.some(approval => 
+      approval.level === 2 && approval.status === "APPROVED" // Mayor approval
     ) && (
-      // For GSO workflow: check for BAC completion (3+ reviews) and Budget not reviewed (Level 3)
+      // For GSO workflow: check for BAC completion (3+ reviews) and Budget not reviewed (Level 4)
       (disbursement?.createdBy?.role === "GSO" && 
        disbursement.bacReviews && disbursement.bacReviews.length >= 3 && // BAC completed
-       !disbursement.approvals.some(approval => approval.level === 3 && approval.status === "APPROVED")) || // Budget not reviewed
-      // For non-GSO workflow: check for Mayor approval (Level 1) and Budget not reviewed (Level 2)
+       !disbursement.approvals.some(approval => approval.level === 4 && approval.status === "APPROVED")) || // Budget not reviewed (Level 4 in GSO)
+      // For non-GSO workflow: check for Budget not reviewed (Level 3)
       (disbursement?.createdBy?.role !== "GSO" && 
-       !disbursement.approvals.some(approval => approval.level === 2 && approval.status === "APPROVED")) // Budget not reviewed
+       !disbursement.approvals.some(approval => approval.level === 3 && approval.status === "APPROVED")) // Budget not reviewed (Level 3 in non-GSO)
     )
 
   // Check if Budget has reviewed this voucher
   const budgetHasReviewedGso = disbursement && 
     disbursement.approvals && // Add null check
     disbursement.approvals.some(approval => 
-      approval.level === 3 && approval.status === "APPROVED" // Budget is Level 3 in GSO workflow
+      approval.level === 4 && approval.status === "APPROVED" // Budget is Level 4 in GSO workflow
+    )
+
+  const budgetHasReviewed = disbursement && 
+    disbursement.approvals && // Add null check
+    disbursement.approvals.some(approval => 
+      approval.level === 3 && approval.status === "APPROVED" // Budget is Level 3 in non-GSO workflow
     )
 
   // Show Accounting review button for all vouchers after Budget approval
@@ -969,27 +1112,35 @@ export default function DisbursementDetailPage() {
     disbursement && 
     ["PENDING"].includes(disbursement.status) &&
     disbursement.approvals && // Add null check
+    // Check for Secretary approval (Level 1) and Mayor approval (Level 2)
+    disbursement.approvals.some(approval => 
+      approval.level === 1 && approval.status === "APPROVED" // Secretary approval
+    ) &&
+    disbursement.approvals.some(approval => 
+      approval.level === 2 && approval.status === "APPROVED" // Mayor approval
+    ) &&
     (
-      // For GSO workflow: check for Budget approval (Level 3) and Accounting not reviewed (Level 4)
+      // For GSO workflow: check for BAC completion (3+ reviews), Budget approval (Level 4), and Accounting not reviewed (Level 5)
       (disbursement?.createdBy?.role === "GSO" && 
-       disbursement.approvals.some(approval => approval.level === 3 && approval.status === "APPROVED") && // Budget approved
-       !disbursement.approvals.some(approval => approval.level === 4 && approval.status === "APPROVED")) || // Accounting not reviewed
-      // For non-GSO workflow: check for Budget approval (Level 2) and Accounting not reviewed (Level 3)
+       disbursement.bacReviews && disbursement.bacReviews.length >= 3 && // BAC completed
+       disbursement.approvals.some(approval => approval.level === 4 && approval.status === "APPROVED") && // Budget approved (Level 4)
+       !disbursement.approvals.some(approval => approval.level === 5 && approval.status === "APPROVED")) || // Accounting not reviewed (Level 5)
+      // For non-GSO workflow: check for Budget approval (Level 3) and Accounting not reviewed (Level 4)
       (disbursement?.createdBy?.role !== "GSO" && 
-       disbursement.approvals.some(approval => approval.level === 2 && approval.status === "APPROVED") && // Budget approved
-       !disbursement.approvals.some(approval => approval.level === 3 && approval.status === "APPROVED")) // Accounting not reviewed
+       disbursement.approvals.some(approval => approval.level === 3 && approval.status === "APPROVED") && // Budget approved (Level 3)
+       !disbursement.approvals.some(approval => approval.level === 4 && approval.status === "APPROVED")) // Accounting not reviewed (Level 4)
     )
 
   // Check if Accounting has reviewed this voucher
   const accountingHasReviewed = disbursement && 
     disbursement.approvals && // Add null check
     (
-      // For GSO workflow: Accounting is Level 4
+      // For GSO workflow: Accounting is Level 5
       (disbursement?.createdBy?.role === "GSO" && 
-       disbursement.approvals.some(approval => approval.level === 4 && approval.status === "APPROVED")) ||
-      // For non-GSO workflow: Accounting is Level 3
+       disbursement.approvals.some(approval => approval.level === 5 && approval.status === "APPROVED")) ||
+      // For non-GSO workflow: Accounting is Level 4
       (disbursement?.createdBy?.role !== "GSO" && 
-       disbursement.approvals.some(approval => approval.level === 3 && approval.status === "APPROVED"))
+       disbursement.approvals.some(approval => approval.level === 4 && approval.status === "APPROVED"))
     )
 
   // Check Treasury actions based on current state
@@ -1003,13 +1154,23 @@ export default function DisbursementDetailPage() {
   const canIssueCheck = session.user.role === "TREASURY" && 
     disbursement && 
     disbursement.approvals && // Add null check
+    // Check for Secretary approval (Level 1) and Mayor approval (Level 2)
+    disbursement.approvals.some(approval => 
+      approval.level === 1 && approval.status === "APPROVED" // Secretary approval
+    ) &&
+    disbursement.approvals.some(approval => 
+      approval.level === 2 && approval.status === "APPROVED" // Mayor approval
+    ) &&
     (
-      // For GSO workflow: check for Accounting approval (Level 4)
+      // For GSO workflow: check for BAC completion (3+ reviews), Budget approval (Level 4), Accounting approval (Level 5)
       (disbursement?.createdBy?.role === "GSO" && 
-       disbursement.approvals.some(approval => approval.level === 4 && approval.status === "APPROVED")) ||
-      // For non-GSO workflow: check for Accounting approval (Level 3)
+       disbursement.bacReviews && disbursement.bacReviews.length >= 3 && // BAC completed
+       disbursement.approvals.some(approval => approval.level === 4 && approval.status === "APPROVED") && // Budget approved (Level 4)
+       disbursement.approvals.some(approval => approval.level === 5 && approval.status === "APPROVED")) || // Accounting approved (Level 5)
+      // For non-GSO workflow: check for Budget approval (Level 3), Accounting approval (Level 4)
       (disbursement?.createdBy?.role !== "GSO" && 
-       disbursement.approvals.some(approval => approval.level === 3 && approval.status === "APPROVED"))
+       disbursement.approvals.some(approval => approval.level === 3 && approval.status === "APPROVED") && // Budget approved (Level 3)
+       disbursement.approvals.some(approval => approval.level === 4 && approval.status === "APPROVED")) // Accounting approved (Level 4)
     ) && 
     !hasCheckIssuance && 
     !hasMarkReleased
@@ -1023,13 +1184,23 @@ export default function DisbursementDetailPage() {
   const showTreasuryActionButton = session.user.role === "TREASURY" && 
     disbursement && 
     disbursement.approvals && // Add null check
+    // Check for Secretary approval (Level 1) and Mayor approval (Level 2)
+    disbursement.approvals.some(approval => 
+      approval.level === 1 && approval.status === "APPROVED" // Secretary approval
+    ) &&
+    disbursement.approvals.some(approval => 
+      approval.level === 2 && approval.status === "APPROVED" // Mayor approval
+    ) &&
     (
-      // For GSO workflow: check for Accounting approval (Level 4)
+      // For GSO workflow: check for BAC completion (3+ reviews), Budget approval (Level 4), Accounting approval (Level 5)
       (disbursement?.createdBy?.role === "GSO" && 
-       disbursement.approvals.some(approval => approval.level === 4 && approval.status === "APPROVED")) ||
-      // For non-GSO workflow: check for Accounting approval (Level 3)
+       disbursement.bacReviews && disbursement.bacReviews.length >= 3 && // BAC completed
+       disbursement.approvals.some(approval => approval.level === 4 && approval.status === "APPROVED") && // Budget approved (Level 4)
+       disbursement.approvals.some(approval => approval.level === 5 && approval.status === "APPROVED")) || // Accounting approved (Level 5)
+      // For non-GSO workflow: check for Budget approval (Level 3), Accounting approval (Level 4)
       (disbursement?.createdBy?.role !== "GSO" && 
-       disbursement.approvals.some(approval => approval.level === 3 && approval.status === "APPROVED"))
+       disbursement.approvals.some(approval => approval.level === 3 && approval.status === "APPROVED") && // Budget approved (Level 3)
+       disbursement.approvals.some(approval => approval.level === 4 && approval.status === "APPROVED")) // Accounting approved (Level 4)
     )
 
   // Check if BAC has already reviewed this voucher
@@ -1039,17 +1210,6 @@ export default function DisbursementDetailPage() {
       trail.userId === session.user.id
     )
 
-  // Check if Budget has already reviewed this voucher
-  const budgetHasReviewed = disbursement && 
-    disbursement.approvals && // Add null check
-    (
-      // For GSO workflow: Budget is Level 3
-      (disbursement?.createdBy?.role === "GSO" && 
-       disbursement.approvals.some(approval => approval.level === 3 && approval.status === "APPROVED")) ||
-      // For non-GSO workflow: Budget is Level 2
-      (disbursement?.createdBy?.role !== "GSO" && 
-       disbursement.approvals.some(approval => approval.level === 2 && approval.status === "APPROVED"))
-    )
 
   // Check if Treasury has already reviewed this voucher
   const treasuryHasReviewed = disbursement && session.user.role === "TREASURY" &&
@@ -1123,6 +1283,23 @@ export default function DisbursementDetailPage() {
                   Reject
                 </Button>
               </>
+            )}
+            {canSecretaryReview && (
+              <Button 
+                onClick={() => setShowReviewDialog(true)}
+                disabled={isApproving || secretaryHasReviewed}
+                className={secretaryHasReviewed 
+                  ? "bg-gray-400 hover:bg-gray-400 cursor-not-allowed" 
+                  : "bg-indigo-600 hover:bg-indigo-700"
+                }
+              >
+                {secretaryHasReviewed ? (
+                  <CheckCircle className="mr-2 h-4 w-4" />
+                ) : (
+                  <Eye className="mr-2 h-4 w-4" />
+                )}
+                {isApproving ? "Processing..." : secretaryHasReviewed ? "Secretary Reviewed" : "Secretary Review"}
+              </Button>
             )}
             {canMayorReview && (
               <Button 
@@ -1541,6 +1718,7 @@ export default function DisbursementDetailPage() {
                         case "REJECT": return "rejected the disbursement"
                         case "UPDATE": return "updated the disbursement"
                         case "VALIDATE": return "validated the disbursement"
+                        case "SECRETARY_REVIEW": return "reviewed the disbursement (Secretary)"
                         case "REVIEW": return "reviewed the disbursement"
                         case "BAC_REVIEW": return "reviewed the disbursement (BAC)"
                         case "BUDGET_REVIEW": return "reviewed the disbursement (Budget Office)"
@@ -1563,6 +1741,7 @@ export default function DisbursementDetailPage() {
                         case "REJECT": return "bg-red-500"
                         case "UPDATE": return "bg-purple-500"
                         case "VALIDATE": return "bg-indigo-500"
+                        case "SECRETARY_REVIEW": return "bg-indigo-600"
                         case "REVIEW": return "bg-cyan-500"
                         case "BAC_REVIEW": return "bg-purple-600"
                         case "BUDGET_REVIEW": return "bg-orange-600"
@@ -1835,7 +2014,9 @@ export default function DisbursementDetailPage() {
               </Button>
               <Button
                 onClick={() => {
-                  if (session.user.role === "BAC") {
+                  if (session.user.role === "SECRETARY") {
+                    handleSecretaryReview()
+                  } else if (session.user.role === "BAC") {
                     handleBacReview()
                   } else if (session.user.role === "BUDGET") {
                     handleBudgetReview()

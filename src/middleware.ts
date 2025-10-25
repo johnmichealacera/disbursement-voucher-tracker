@@ -34,7 +34,7 @@ export default withAuth(
       }
 
       // Create route - available for all roles
-      if (pathname.startsWith("/create") && !["REQUESTER", "ACCOUNTING", "BUDGET", "TREASURY", "MAYOR", "ADMIN", "DEPARTMENT_HEAD", "FINANCE_HEAD", "GSO", "HR", "BAC"].includes(userRole)) {
+      if (pathname.startsWith("/create") && !["REQUESTER", "ACCOUNTING", "BUDGET", "TREASURY", "MAYOR", "ADMIN", "DEPARTMENT_HEAD", "FINANCE_HEAD", "GSO", "HR", "BAC", "SECRETARY"].includes(userRole)) {
         return NextResponse.redirect(new URL("/dashboard", req.url))
       }
     }

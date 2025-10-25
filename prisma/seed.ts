@@ -44,10 +44,10 @@ async function main() {
       department: 'Treasury Department'
     },
     {
-      name: 'Mayor Smith',
-      email: 'mayor@municipality.gov',
-      password: await bcrypt.hash('mayor123', 12),
-      role: 'MAYOR' as UserRole,
+      name: 'Secretary Officer',
+      email: 'secretary@municipality.gov',
+      password: await bcrypt.hash('secretary123', 12),
+      role: 'SECRETARY' as UserRole,
       department: 'Executive Office'
     },
     {
@@ -276,6 +276,7 @@ async function main() {
   console.log('Accounting: accounting@municipality.gov / accounting123')
   console.log('Budget: budget@municipality.gov / budget123')
   console.log('Treasury: treasury@municipality.gov / treasury123')
+  console.log('Secretary: secretary@municipality.gov / secretary123')
   console.log('Mayor: mayor@municipality.gov / mayor123')
   console.log('Dept Head: depthead@municipality.gov / depthead123')
   console.log('Finance Head: finhead@municipality.gov / finhead123')

@@ -116,6 +116,11 @@ export async function GET(request: NextRequest) {
           }
         }
       ]
+    } else if (session.user.role === "SECRETARY") {
+      // Secretary can view all vouchers that need their review
+      where.status = {
+        in: ["PENDING", "VALIDATED", "APPROVED", "RELEASED", "REJECTED"]
+      }
     } else if (session.user.role === "MAYOR") {
       // Mayor can view all vouchers from GSO, HR, and regular offices
       where.AND = [

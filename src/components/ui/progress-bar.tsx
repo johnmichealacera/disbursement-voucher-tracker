@@ -17,7 +17,16 @@ interface ProgressBarProps {
 export function ProgressBar({ steps, className }: ProgressBarProps) {
   const currentStep = steps.find(step => step.status === "current")
   const completedSteps = steps.filter(step => step.status === "completed")
-  const progressPercentage = currentStep ? currentStep.percentage : 100
+  
+  // Calculate progress percentage based on current step or last completed step
+  let progressPercentage = 0
+  if (currentStep) {
+    progressPercentage = currentStep.percentage
+  } else if (completedSteps.length > 0) {
+    // If no current step, use the percentage of the last completed step
+    const lastCompletedStep = completedSteps[completedSteps.length - 1]
+    progressPercentage = lastCompletedStep.percentage
+  }
 
   return (
     <div className={cn("w-full", className)}>
@@ -36,7 +45,8 @@ export function ProgressBar({ steps, className }: ProgressBarProps) {
             Progress: {progressPercentage}%
           </span>
           <span className="text-sm text-gray-500">
-            {currentStep ? `Next: ${currentStep.label}` : "Completed"}
+            {currentStep ? `Next: ${currentStep.label}` : 
+             completedSteps.length > 0 ? "Awaiting next step" : "Not started"}
           </span>
         </div>
       </div>

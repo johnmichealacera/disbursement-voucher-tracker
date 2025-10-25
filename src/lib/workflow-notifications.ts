@@ -15,56 +15,74 @@ interface NotificationData {
 
 export async function sendWorkflowNotifications(data: NotificationData) {
   try {
-    // Determine which departments should be notified based on the workflow
-    const departmentsToNotify = getDepartmentsToNotify(data.disbursementCreatedBy, data.action)
+    console.log(`Starting workflow notifications for disbursement: ${data.disbursementId}, created by: ${data.disbursementCreatedBy}`)
     
-    // Get all users from the departments that should be notified
-    const usersToNotify = await prisma.user.findMany({
-      where: {
-        role: {
-          in: departmentsToNotify
+    // Add timeout to prevent hanging
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Notification timeout')), 10000) // 10 second timeout
+    })
+    
+    const notificationPromise = (async () => {
+      // Determine which departments should be notified based on the workflow
+      const departmentsToNotify = getDepartmentsToNotify(data.disbursementCreatedBy, data.action)
+      console.log(`Departments to notify:`, departmentsToNotify)
+      
+      // Get all users from the departments that should be notified
+      const usersToNotify = await prisma.user.findMany({
+        where: {
+          role: {
+            in: departmentsToNotify
+          },
+          isActive: true
         },
-        isActive: true
-      },
-      select: {
-        id: true,
-        name: true,
-        role: true,
-        department: true
-      }
-    })
-
-    // Create notification message based on the action
-    const notificationMessage = createNotificationMessage(data)
-    
-    // First, delete existing notifications for this disbursement to prevent stacking
-    await prisma.notification.deleteMany({
-      where: {
-        disbursementVoucherId: data.disbursementId,
-        userId: {
-          in: usersToNotify.map(user => user.id)
+        select: {
+          id: true,
+          name: true,
+          role: true,
+          department: true
         }
-      }
-    })
+      })
+
+      console.log(`Found ${usersToNotify.length} users to notify`)
+
+      // Create notification message based on the action
+      const notificationMessage = createNotificationMessage(data)
+      console.log(`Notification message: ${notificationMessage}`)
+      
+      // First, delete existing notifications for this disbursement to prevent stacking
+      await prisma.notification.deleteMany({
+        where: {
+          disbursementVoucherId: data.disbursementId,
+          userId: {
+            in: usersToNotify.map(user => user.id)
+          }
+        }
+      })
+      
+      // Create notifications for all relevant users
+      const notifications = usersToNotify.map(user => ({
+        type: "workflow_update",
+        title: "Disbursement Status Update",
+        message: notificationMessage,
+        priority: getNotificationPriority(data.action),
+        userId: user.id,
+        disbursementVoucherId: data.disbursementId
+      }))
+
+      // Bulk create notifications
+      await prisma.notification.createMany({
+        data: notifications
+      })
+
+      console.log(`Sent workflow notifications to ${notifications.length} users for disbursement ${data.disbursementId}`)
+    })()
     
-    // Create notifications for all relevant users
-    const notifications = usersToNotify.map(user => ({
-      type: "workflow_update",
-      title: "Disbursement Status Update",
-      message: notificationMessage,
-      priority: getNotificationPriority(data.action),
-      userId: user.id,
-      disbursementVoucherId: data.disbursementId
-    }))
-
-    // Bulk create notifications
-    await prisma.notification.createMany({
-      data: notifications
-    })
-
-    console.log(`Sent workflow notifications to ${notifications.length} users for disbursement ${data.disbursementId}`)
+    // Race between notification and timeout
+    await Promise.race([notificationPromise, timeoutPromise])
+    
   } catch (error) {
     console.error("Error sending workflow notifications:", error)
+    // Don't throw the error, just log it
   }
 }
 
@@ -77,14 +95,14 @@ function getDepartmentsToNotify(disbursementCreatedBy: UserRole, action: string)
   
   // Add departments based on workflow type
   if (disbursementCreatedBy === "GSO") {
-    // GSO workflow: Mayor, BAC, Budget, Accounting, Treasury
-    baseDepartments.push("MAYOR", "BAC", "BUDGET", "ACCOUNTING", "TREASURY")
+    // GSO workflow: Secretary, Mayor, BAC, Budget, Accounting, Treasury
+    baseDepartments.push("SECRETARY", "MAYOR", "BAC", "BUDGET", "ACCOUNTING", "TREASURY")
   } else if (disbursementCreatedBy === "HR") {
-    // HR workflow: Mayor, Budget, Accounting, Treasury (BAC removed)
-    baseDepartments.push("MAYOR", "BUDGET", "ACCOUNTING", "TREASURY")
+    // HR workflow: Secretary, Mayor, Budget, Accounting, Treasury (BAC removed)
+    baseDepartments.push("SECRETARY", "MAYOR", "BUDGET", "ACCOUNTING", "TREASURY")
   } else {
-    // Standard workflow: Mayor, Budget, Accounting, Treasury (BAC removed)
-    baseDepartments.push("MAYOR", "BUDGET", "ACCOUNTING", "TREASURY")
+    // Standard workflow: Secretary, Mayor, Budget, Accounting, Treasury (BAC removed)
+    baseDepartments.push("SECRETARY", "MAYOR", "BUDGET", "ACCOUNTING", "TREASURY")
   }
   
   // Remove duplicates
@@ -114,6 +132,9 @@ function createNotificationMessage(data: NotificationData): string {
       
     case "VALIDATE":
       return `Disbursement voucher "${payee}" (${formattedAmount}) has been validated by ${performedBy} (${performedByRole.replace("_", " ")})`
+      
+    case "SECRETARY_REVIEW":
+      return `Disbursement voucher "${payee}" (${formattedAmount}) has been reviewed by Secretary (${performedBy})`
       
     case "REVIEW":
       return `Disbursement voucher "${payee}" (${formattedAmount}) has been reviewed by ${performedBy} (Mayor)`
@@ -145,6 +166,7 @@ function getNotificationPriority(action: string): "high" | "medium" | "low" {
     case "MARK_RELEASED":
       return "high"
     case "APPROVE":
+    case "SECRETARY_REVIEW":
     case "REVIEW":
     case "BAC_REVIEW":
     case "BUDGET_REVIEW":

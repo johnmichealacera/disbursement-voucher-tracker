@@ -22,6 +22,7 @@ enum UserRole {
   GSO
   HR
   BAC
+  SECRETARY
 }
 
 enum VoucherStatus {

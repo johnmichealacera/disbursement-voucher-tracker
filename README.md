@@ -14,10 +14,10 @@ A comprehensive, transparent, and efficient disbursement tracking system designe
 ## 🚀 Features
 
 ### Core Functionality
-- **Multi-role Authentication**: Supports 11 different user roles with appropriate permissions
+- **Multi-role Authentication**: Supports 12 different user roles with appropriate permissions
 - **Disbursement Lifecycle Management**: From draft creation to fund release
-- **Multi-level Approval Workflow**: Department Head → Finance Head → Mayor
-- **GSO Specialized Workflow**: Mayor → BAC → Budget → Accounting → Treasury review chain
+- **Multi-level Approval Workflow**: Secretary → Mayor → Budget → Accounting → Treasury
+- **GSO Specialized Workflow**: Secretary → Mayor → BAC → Budget → Accounting → Treasury review chain
 - **Real-time Status Tracking**: Complete visibility of disbursement progress
 - **Comprehensive Audit Trail**: Full transparency with detailed activity logs and timestamps
 
@@ -25,6 +25,7 @@ A comprehensive, transparent, and efficient disbursement tracking system designe
 - **Requester**: Create and manage disbursement requests
 - **GSO (General Services Office)**: Create and manage procurement-related disbursement requests
 - **HR (Human Resources)**: Create and manage HR-related disbursement requests
+- **Secretary**: Initial review and validation of all disbursement requests
 - **Accounting**: Validate and process financial aspects, review GSO workflow vouchers
 - **Budget**: Review budget allocations and compliance, review GSO workflow vouchers
 - **Treasury**: Handle fund disbursement and payment processing, final review for GSO workflow
@@ -139,6 +140,7 @@ The seed script creates the following test accounts:
 | Requester | requester@municipality.gov | requester123 | Public Works |
 | GSO | gso@municipality.gov | gso123 | General Services Office |
 | HR | hr@municipality.gov | hr123 | Human Resources |
+| Secretary | secretary@municipality.gov | secretary123 | Executive Office |
 | BAC | bac@municipality.gov | bac123 | Bids and Awards Committee |
 | Accounting | accounting@municipality.gov | accounting123 | Finance Department |
 | Budget | budget@municipality.gov | budget123 | Finance Department |
@@ -177,34 +179,38 @@ prisma/
 
 ## 🔄 Workflow Process
 
-### 1. Initiation (Requester)
+### 1. Initiation (Requester/GSO/HR)
 - Create disbursement voucher with detailed items
 - Add supporting documents
-- Submit for validation (triggers notifications)
+- Submit for review (triggers notifications)
 
-### 2. Validation (Accounting/Finance)
+### 2. Secretary Review (Level 1)
 - Receive real-time notification of pending vouchers
-- Review completeness and budget allocation
-- Use "Validate" button for approval or "Reject" with remarks
+- Initial review and validation of all disbursement requests
+- Use "Secretary Review" button for approval
 - System automatically updates status and notifies next level
 
 ### 3. Multi-Level Approval Workflow
-- **Level 1**: Department Head receives notification → "Validate" button → Status: VALIDATED
-- **Level 2**: Finance Head receives notification → "Approve" button → Status: APPROVED  
-- **Level 3**: Mayor receives notification → "Final Approve" button → Status: RELEASED
-- **Sequential enforcement**: Each level must be completed before the next
 
-### 4. Disbursement Processing (Treasury)
-- Receive notification when voucher is fully approved
-- Prepare disbursement voucher
-- Validate compliance
-- Process payment and mark as "Released"
+#### Standard Workflow (Non-GSO/Non-HR)
+- **Level 1**: Secretary receives notification → "Secretary Review" button → Status: PENDING
+- **Level 2**: Mayor receives notification → "Approve" button → Status: PENDING  
+- **Level 3**: Budget receives notification → "Budget Review" button → Status: PENDING
+- **Level 4**: Accounting receives notification → "Accounting Review" button → Status: PENDING
+- **Level 5**: Treasury receives notification → "Check Issuance" → "Mark Released" → Status: RELEASED
 
-### 5. Status Notifications
-- **Requesters**: Get notified of status changes (validated, approved, released, rejected)
-- **Approvers**: Get notified of pending items requiring their action
-- **Treasury**: Get notified of approved vouchers ready for disbursement
-- **Admin**: Get overview of all pending items across all levels
+#### GSO Specialized Workflow
+- **Level 1**: Secretary receives notification → "Secretary Review" button → Status: PENDING
+- **Level 2**: Mayor receives notification → "Approve" button → Status: PENDING
+- **BAC Review**: BAC Committee reviews (3+ members required) → Status: PENDING
+- **Level 4**: Budget receives notification → "Budget Review" button → Status: PENDING
+- **Level 5**: Accounting receives notification → "Accounting Review" button → Status: PENDING
+- **Level 6**: Treasury receives notification → "Check Issuance" → "Mark Released" → Status: RELEASED
+
+### 4. Sequential Enforcement
+- Each level must be completed before the next
+- Role-based button visibility ensures proper workflow progression
+- Comprehensive audit trail tracks all actions
 
 ## 🔐 Security Features
 
@@ -443,9 +449,13 @@ For technical support or questions:
 ## 🐛 Critical Bug Fixes (v3.3)
 
 ### **🔧 Workflow Logic Fixes**
+- **Added Secretary Role**: New initial review step for both GSO and non-GSO workflows
+- **Fixed Approval Level Mapping**: Corrected approval levels for all workflows (Secretary=1, Mayor=2, etc.)
 - **Fixed GSO vs Standard Workflow Approval Levels**: Corrected hardcoded approval level checks that were causing incorrect button states and progress calculations
 - **Budget Review Logic**: Fixed budget review button showing "already reviewed" when it wasn't actually reviewed in GSO workflows
 - **Accounting Review Logic**: Fixed accounting review button logic to check correct approval levels based on workflow type
+- **Treasury Review Logic**: Fixed Treasury button visibility and status progression for both workflows
+- **Status Progression Fix**: Fixed GSO disbursements being incorrectly marked as "RELEASED" after Accounting review
 - **Treasury Review Logic**: Fixed treasury action buttons to wait for correct accounting approval levels
 
 ### **⚡ Data Loading Race Condition Fixes**

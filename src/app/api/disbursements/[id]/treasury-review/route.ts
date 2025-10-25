@@ -55,20 +55,52 @@ export async function POST(
 
     // Handle different actions
     if (validatedData.action === "CHECK_ISSUANCE") {
-      // Check if Accounting has already reviewed this voucher (using approval levels)
-      const accountingHasReviewed = (
-        // For GSO workflow: Accounting is Level 4
-        (disbursement.createdBy.role === "GSO" && 
-         disbursement.approvals.some(approval => approval.level === 4 && approval.status === "APPROVED")) ||
-        // For non-GSO workflow: Accounting is Level 3
-        (disbursement.createdBy.role !== "GSO" && 
-         disbursement.approvals.some(approval => approval.level === 3 && approval.status === "APPROVED"))
-      )
-
-      if (!accountingHasReviewed) {
-        return NextResponse.json({ 
-          error: "Treasury Office can only issue checks after Accounting has reviewed the voucher" 
-        }, { status: 400 })
+      // Check prerequisites based on workflow type
+      if (disbursement.createdBy.role === "GSO") {
+        // For GSO workflow: check Secretary (Level 1), Mayor (Level 2), BAC (3+ reviews), Budget (Level 4), Accounting (Level 5)
+        const secretaryApproved = disbursement.approvals.some(approval => 
+          approval.level === 1 && approval.status === "APPROVED"
+        )
+        const mayorApproved = disbursement.approvals.some(approval => 
+          approval.level === 2 && approval.status === "APPROVED"
+        )
+        const budgetApproved = disbursement.approvals.some(approval => 
+          approval.level === 4 && approval.status === "APPROVED"
+        )
+        const accountingApproved = disbursement.approvals.some(approval => 
+          approval.level === 5 && approval.status === "APPROVED"
+        )
+        
+        const bacReviewCount = await prisma.bacReview.count({
+          where: { disbursementVoucherId: id }
+        })
+        const bacCompleted = bacReviewCount >= 3
+        
+        if (!secretaryApproved || !mayorApproved || !bacCompleted || !budgetApproved || !accountingApproved) {
+          return NextResponse.json({ 
+            error: "Treasury can only issue checks after all previous approvals are completed for GSO workflow" 
+          }, { status: 400 })
+        }
+      } else {
+        // For non-GSO workflow: check Secretary (Level 1), Mayor (Level 2), Budget (Level 3), Accounting (Level 4)
+        const secretaryApproved = disbursement.approvals.some(approval => 
+          approval.level === 1 && approval.status === "APPROVED"
+        )
+        const mayorApproved = disbursement.approvals.some(approval => 
+          approval.level === 2 && approval.status === "APPROVED"
+        )
+        const budgetApproved = disbursement.approvals.some(approval => 
+          approval.level === 3 && approval.status === "APPROVED"
+        )
+        const accountingApproved = disbursement.approvals.some(approval => 
+          approval.level === 4 && approval.status === "APPROVED"
+        )
+        
+        if (!secretaryApproved || !mayorApproved || !budgetApproved || !accountingApproved) {
+          return NextResponse.json({ 
+            error: "Treasury can only issue checks after all previous approvals are completed for non-GSO workflow" 
+          }, { status: 400 })
+        }
       }
 
       // Check if check number is provided

@@ -63,18 +63,24 @@ function calculateStandardProgress(disbursement: DisbursementData): ProgressStep
       id: "draft",
       label: "Draft Created",
       status: "completed",
-      percentage: 10
+      percentage: 8
     },
     {
       id: "submitted",
       label: "Submitted for Review",
       status: disbursement.status === "DRAFT" ? "pending" : "completed",
-      percentage: 20
+      percentage: 16
+    },
+    {
+      id: "secretary-review",
+      label: "Secretary Review",
+      status: getStandardReviewStatus(disbursement, "SECRETARY_REVIEW", 16),
+      percentage: 25
     },
     {
       id: "mayor-review",
       label: "Mayor Review",
-      status: getStandardReviewStatus(disbursement, "REVIEW", 20),
+      status: getStandardReviewStatus(disbursement, "REVIEW", 25),
       percentage: 40
     },
     {
@@ -124,18 +130,24 @@ function calculateGSOProgress(disbursement: DisbursementData): ProgressStep[] {
       id: "draft",
       label: "GSO Draft Created",
       status: "completed",
-      percentage: 8
+      percentage: 6
     },
     {
       id: "submitted",
       label: "Submitted for Review",
       status: disbursement.status === "DRAFT" ? "pending" : "completed",
-      percentage: 16
+      percentage: 12
+    },
+    {
+      id: "secretary-review",
+      label: "Secretary Review",
+      status: getGSOReviewStatus(disbursement, "SECRETARY_REVIEW", 12),
+      percentage: 20
     },
     {
       id: "mayor-review",
       label: "Mayor Review",
-      status: getGSOReviewStatus(disbursement, "REVIEW", 16),
+      status: getGSOReviewStatus(disbursement, "REVIEW", 20),
       percentage: 33
     },
     {
@@ -191,18 +203,24 @@ function calculateHRProgress(disbursement: DisbursementData): ProgressStep[] {
       id: "draft",
       label: "HR Draft Created",
       status: "completed",
-      percentage: 10
+      percentage: 8
     },
     {
       id: "submitted",
       label: "Submitted for Review",
       status: disbursement.status === "DRAFT" ? "pending" : "completed",
-      percentage: 20
+      percentage: 16
+    },
+    {
+      id: "secretary-review",
+      label: "Secretary Review",
+      status: getStandardReviewStatus(disbursement, "SECRETARY_REVIEW", 16),
+      percentage: 25
     },
     {
       id: "mayor-review",
       label: "Mayor Review",
-      status: getStandardReviewStatus(disbursement, "REVIEW", 20),
+      status: getStandardReviewStatus(disbursement, "REVIEW", 25),
       percentage: 40
     },
     {
@@ -250,10 +268,11 @@ function getStandardReviewStatus(disbursement: DisbursementData, actionType: str
   
   // Map action types to approval levels
   const actionToLevel: Record<string, number> = {
-    "REVIEW": 1,
-    "BUDGET_REVIEW": 2,
-    "ACCOUNTING_REVIEW": 3,
-    "TREASURY_REVIEW": 4
+    "SECRETARY_REVIEW": 1,
+    "REVIEW": 2,
+    "BUDGET_REVIEW": 3,
+    "ACCOUNTING_REVIEW": 4,
+    "TREASURY_REVIEW": 5
   }
   
   const targetLevel = actionToLevel[actionType]
@@ -301,19 +320,31 @@ function getGSOReviewStatus(disbursement: DisbursementData, actionType: string, 
     const bacReviewCount = disbursement.bacReviews ? disbursement.bacReviews.length : 0
     if (bacReviewCount >= 3) return "completed"
     
-    // Check if Mayor has reviewed (prerequisite for BAC review)
+    // Check if Mayor has reviewed (prerequisite for BAC review) - Mayor is level 2 in GSO workflow
     const mayorHasReviewed = disbursement.approvals.some(approval => 
+      approval.level === 2 && approval.status === "APPROVED"
+    )
+    
+    // Check if Secretary has reviewed (prerequisite for Mayor) - Secretary is level 1
+    const secretaryHasReviewed = disbursement.approvals.some(approval => 
       approval.level === 1 && approval.status === "APPROVED"
     )
-    return mayorHasReviewed ? "current" : "pending"
+    
+    // BAC can only start if both Secretary and Mayor have reviewed
+    if (secretaryHasReviewed && mayorHasReviewed) {
+      return bacReviewCount > 0 ? "current" : "current"
+    }
+    
+    return "pending"
   }
   
   // Map action types to approval levels for GSO workflow
   const actionToLevel: Record<string, number> = {
-    "REVIEW": 1,
-    "BUDGET_REVIEW": 3, // Budget is Level 3 in GSO workflow
-    "ACCOUNTING_REVIEW": 4,
-    "TREASURY_REVIEW": 5
+    "SECRETARY_REVIEW": 1,
+    "REVIEW": 2,
+    "BUDGET_REVIEW": 4, // Budget is Level 4 in GSO workflow (after BAC)
+    "ACCOUNTING_REVIEW": 5,
+    "TREASURY_REVIEW": 6
   }
   
   const targetLevel = actionToLevel[actionType]
@@ -379,7 +410,8 @@ function getTreasuryStatus(disbursement: DisbursementData, actionType: string, p
       if (hasCheckIssuance) return "completed"
       // Check if Accounting has reviewed (prerequisite) - use approval levels
       const accountingHasReviewed = disbursement.approvals.some(approval => 
-        approval.level === 3 && approval.status === "APPROVED"
+        (disbursement.createdBy.role === "GSO" && approval.level === 5 && approval.status === "APPROVED") || // GSO workflow: Accounting is Level 5
+        (disbursement.createdBy.role !== "GSO" && approval.level === 4 && approval.status === "APPROVED")    // Standard workflow: Accounting is Level 4
       )
       return accountingHasReviewed ? "current" : "pending"
       
@@ -400,23 +432,24 @@ function getTreasuryStatus(disbursement: DisbursementData, actionType: string, p
 
 function getRoleForAction(actionType: string): UserRole {
   switch (actionType) {
+    case "SECRETARY_REVIEW": return "SECRETARY"
     case "REVIEW": return "MAYOR"
     case "BAC_REVIEW": return "BAC"
     case "BUDGET_REVIEW": return "BUDGET"
     case "ACCOUNTING_REVIEW": return "ACCOUNTING"
     case "TREASURY_REVIEW": return "TREASURY"
-    default: return "MAYOR"
+    default: return "SECRETARY"
   }
 }
 
 function getPreviousStandardActions(actionType: string): string[] {
-  const actionOrder = ["REVIEW", "BUDGET_REVIEW", "ACCOUNTING_REVIEW", "TREASURY_REVIEW"]
+  const actionOrder = ["SECRETARY_REVIEW", "REVIEW", "BUDGET_REVIEW", "ACCOUNTING_REVIEW", "TREASURY_REVIEW"]
   const currentIndex = actionOrder.indexOf(actionType)
   return actionOrder.slice(0, currentIndex)
 }
 
 function getPreviousGSOActions(actionType: string): string[] {
-  const actionOrder = ["REVIEW", "BAC_REVIEW", "BUDGET_REVIEW", "ACCOUNTING_REVIEW", "TREASURY_REVIEW"]
+  const actionOrder = ["SECRETARY_REVIEW", "REVIEW", "BAC_REVIEW", "BUDGET_REVIEW", "ACCOUNTING_REVIEW", "TREASURY_REVIEW"]
   const currentIndex = actionOrder.indexOf(actionType)
   return actionOrder.slice(0, currentIndex)
 }
