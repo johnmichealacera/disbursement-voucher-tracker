@@ -7,6 +7,7 @@ interface ProgressStep {
   label: string
   status: "completed" | "current" | "pending" | "rejected"
   percentage: number
+  completedBy?: string
 }
 
 interface ProgressBarProps {
@@ -45,8 +46,13 @@ export function ProgressBar({ steps, className }: ProgressBarProps) {
             Progress: {progressPercentage}%
           </span>
           <span className="text-sm text-gray-500">
-            {currentStep ? `Next: ${currentStep.label}` : 
-             completedSteps.length > 0 ? "Awaiting next step" : "Not started"}
+            {progressPercentage >= 100
+              ? "Complete"
+              : currentStep
+              ? `Next: ${currentStep.label}`
+              : completedSteps.length > 0
+              ? "Awaiting next step"
+              : "Not started"}
           </span>
         </div>
       </div>
@@ -79,18 +85,22 @@ export function ProgressBar({ steps, className }: ProgressBarProps) {
             </div>
             
             {/* Step label */}
-            <div className="flex-1">
-              <p className={cn(
-                "text-sm font-medium",
-                {
-                  "text-green-700": step.status === "completed",
-                  "text-blue-700": step.status === "current",
-                  "text-gray-500": step.status === "pending",
-                  "text-red-700": step.status === "rejected"
-                }
-              )}>
-                {step.label}
+          <div className="flex-1">
+            <p
+              className={cn("text-sm font-medium", {
+                "text-green-700": step.status === "completed",
+                "text-blue-700": step.status === "current",
+                "text-gray-500": step.status === "pending",
+                "text-red-700": step.status === "rejected",
+              })}
+            >
+              {step.label}
+            </p>
+            {step.completedBy && step.status !== "pending" && (
+              <p className="text-xs text-gray-500 mt-0.5">
+                Processed by {step.completedBy}
               </p>
+            )}
             </div>
             
             {/* Step status badge */}

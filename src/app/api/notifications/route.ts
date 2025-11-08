@@ -430,11 +430,18 @@ export async function GET() {
     // Sort notifications by priority and date
     const priorityOrder = { high: 3, medium: 2, low: 1 }
     notifications.sort((a, b) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+
+      if (dateB !== dateA) {
+        return dateB - dateA
+      }
+
       if (priorityOrder[a.priority] !== priorityOrder[b.priority]) {
         return priorityOrder[b.priority] - priorityOrder[a.priority]
       }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return new Date(b.createdAt as any).getTime() - new Date(a.createdAt as any).getTime()
+
+      return a.id.localeCompare(b.id)
     })
 
     return NextResponse.json({
