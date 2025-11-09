@@ -19,6 +19,9 @@ export async function PATCH(
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
+    if (session.user.role !== "ADMIN") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
 
     const { id } = await params
 
@@ -47,6 +50,32 @@ export async function PATCH(
     return NextResponse.json({ payee: updatedPayee })
   } catch (error) {
     console.error("Error updating payee:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+    if (session.user.role !== "ADMIN") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
+
+    const { id } = await params
+
+    await prisma.payeeDirectory.delete({
+      where: { id }
+    })
+
+    return new NextResponse(null, { status: 204 })
+  } catch (error) {
+    console.error("Error deleting payee:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

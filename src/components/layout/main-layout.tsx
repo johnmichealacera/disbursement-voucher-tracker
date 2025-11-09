@@ -65,6 +65,12 @@ const navigation = [
     href: "/admin/users",
     icon: Users,
     roles: ["ADMIN"]
+  },
+  {
+    name: "Directory Management",
+    href: "/admin/directories",
+    icon: Settings,
+    roles: ["ADMIN"]
   }
 ]
 

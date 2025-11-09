@@ -120,7 +120,6 @@ export default function CreateVoucherPage() {
 
   // Determine if user is GSO
   const isGSOUser = session?.user?.role === "GSO"
-
   // Use appropriate schema based on user role
   const schema = isGSOUser ? createGSOVoucherSchema : createNonGSOVoucherSchema
 
@@ -171,7 +170,7 @@ export default function CreateVoucherPage() {
 
   const loadPayees = useCallback(async () => {
     try {
-      const response = await fetch("/api/payees?status=ACTIVE")
+      const response = await fetch("/api/payees?status=ACTIVE", { cache: "no-store" })
       if (!response.ok) {
         throw new Error("Failed to fetch payees")
       }
@@ -185,7 +184,7 @@ export default function CreateVoucherPage() {
 
   const loadTags = useCallback(async () => {
     try {
-      const response = await fetch("/api/tags?status=ACTIVE")
+      const response = await fetch("/api/tags?status=ACTIVE", { cache: "no-store" })
       if (!response.ok) {
         throw new Error("Failed to fetch tags")
       }
@@ -199,7 +198,7 @@ export default function CreateVoucherPage() {
 
   const loadItems = useCallback(async () => {
     try {
-      const response = await fetch("/api/items?status=ACTIVE")
+      const response = await fetch("/api/items?status=ACTIVE", { cache: "no-store" })
       if (!response.ok) {
         throw new Error("Failed to fetch items")
       }
@@ -394,6 +393,14 @@ const handleCreateTag = useCallback(async () => {
     }
 }, [newItemName, newItemUnit, newItemPrice, sortItemOptions])
 
+  const calculateItemTotal = useCallback((index: number) => {
+    const quantity = form.getValues(`items.${index}.quantity`) || 0
+    const unitPrice = form.getValues(`items.${index}.unitPrice`) || 0
+    const total = quantity * unitPrice
+    form.setValue(`items.${index}.totalPrice`, total)
+  }, [form])
+
+
 const handleSelectExistingTag = useCallback(
   (tagId: string | undefined) => {
     if (!tagId) return
@@ -416,13 +423,6 @@ const handleRemoveTag = useCallback(
   },
   [form]
 )
-
-const calculateItemTotal = useCallback((index: number) => {
-  const quantity = form.getValues(`items.${index}.quantity`) || 0
-  const unitPrice = form.getValues(`items.${index}.unitPrice`) || 0
-  const total = quantity * unitPrice
-  form.setValue(`items.${index}.totalPrice`, total)
-}, [form])
 
 const handleSelectItemFromDirectory = useCallback(
   (index: number, itemId: string | undefined) => {
@@ -882,7 +882,7 @@ const handleSelectItemFromDirectory = useCallback(
                           >
                             <X className="mr-2 h-4 w-4" />
                             Clear
-                          </Button>
+                        </Button>
                         </div>
                       </div>
                       <div className="flex flex-wrap gap-2">
@@ -1517,6 +1517,7 @@ const handleSelectItemFromDirectory = useCallback(
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
       </div>
     </MainLayout>
   )
