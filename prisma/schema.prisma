@@ -40,6 +40,11 @@ enum ApprovalStatus {
   REJECTED
 }
 
+enum PayeeStatus {
+  ACTIVE
+  INACTIVE
+}
+
 enum PaymentMethod {
   CASH
   CHECK
@@ -231,6 +236,41 @@ model BacReview {
 
   @@unique([reviewerId, disbursementVoucherId])
   @@map("bac_reviews")
+}
+
+model PayeeDirectory {
+  id        String      @id @default(cuid())
+  name      String
+  address   String
+  status    PayeeStatus @default(ACTIVE)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@unique([name, address])
+  @@map("payee_directory")
+}
+
+model TagDirectory {
+  id        String      @id @default(cuid())
+  name      String      @unique
+  status    PayeeStatus @default(ACTIVE)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@map("tag_directory")
+}
+
+model ItemDirectory {
+  id               String      @id @default(cuid())
+  name             String
+  unit             String?
+  defaultUnitPrice Decimal?    @db.Decimal(12, 2)
+  status           PayeeStatus @default(ACTIVE)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  @@unique([name, unit])
+  @@map("item_directory")
 }
 
 // NextAuth.js required models

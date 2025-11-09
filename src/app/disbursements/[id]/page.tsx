@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useMemo } from "react"
+import { useEffect, useState, useMemo, useCallback } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter, useParams } from "next/navigation"
 import { MainLayout } from "@/components/layout/main-layout"
@@ -220,36 +220,16 @@ export default function DisbursementDetailPage() {
     }
   }
 
-  const handleSubmitForReview = async () => {
-    if (!disbursement) return
-
-    if (!reviewPassword.trim()) {
-      setReviewPasswordError("Password is required")
+  const handleSubmitForReview = useCallback(async () => {
+    if (!disbursement) {
+      setError("Disbursement data is not available yet.")
       return
     }
 
-    setIsSubmitting(true)
-    setError("")
-    setReviewPasswordError("")
-
     try {
-      // First verify password
-      const passwordResponse = await fetch("/api/auth/verify-password", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ password: reviewPassword }),
-      })
+      setIsSubmitting(true)
+      setError("")
 
-      if (!passwordResponse.ok) {
-        const errorData = await passwordResponse.json()
-        setReviewPasswordError(errorData.error || "Invalid password")
-        setIsSubmitting(false)
-        return
-      }
-
-      // If password is valid, proceed with submission
       const response = await fetch(`/api/disbursements/${id}/submit`, {
         method: "POST",
         headers: {
@@ -260,8 +240,6 @@ export default function DisbursementDetailPage() {
       if (response.ok) {
         const updatedDisbursement = await response.json()
         setDisbursement(updatedDisbursement)
-        setShowReviewDialog(false)
-        setReviewPassword("")
       } else {
         const errorData = await response.json()
         setError(errorData.error || "Failed to submit for review")
@@ -271,7 +249,7 @@ export default function DisbursementDetailPage() {
     } finally {
       setIsSubmitting(false)
     }
-  }
+  }, [disbursement, id])
 
   const handleApproval = async (status: "APPROVED" | "REJECTED", remarks?: string) => {
     if (!disbursement) return
@@ -1254,8 +1232,12 @@ export default function DisbursementDetailPage() {
             })()}
             {canSubmit && (
               <Button 
-                onClick={handleSubmitForReview}
+                onClick={async () => {
+                  setError("")
+                  await handleSubmitForReview()
+                }}
                 disabled={isSubmitting}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg disabled:bg-indigo-300 disabled:text-white disabled:shadow-none px-4 py-2 font-semibold transition-transform duration-150 hover:-translate-y-0.5"
               >
                 <Send className="mr-2 h-4 w-4" />
                 {isSubmitting ? "Submitting..." : "Submit for Review"}

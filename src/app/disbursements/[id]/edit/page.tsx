@@ -248,7 +248,11 @@ export default function EditDisbursementPage() {
         const response = await fetch("/api/departments")
         if (response.ok) {
           const data = await response.json()
-          setOffices(data.departments)
+          const normalized =
+            Array.isArray(data) ? data :
+            Array.isArray(data?.departments) ? data.departments :
+            []
+          setOffices(normalized)
         }
       } catch (error) {
         console.error("Error fetching offices:", error)

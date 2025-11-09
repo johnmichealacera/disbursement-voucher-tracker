@@ -446,7 +446,7 @@ export async function GET() {
 
     return NextResponse.json({
       notifications: notifications.slice(0, 20), // Limit to 20 most important
-      unreadCount: notifications.filter(n => n.priority === "high").length
+      unreadCount: storedNotifications.length
     })
 
   } catch (error) {

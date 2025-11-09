@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { useForm, useFieldArray } from "react-hook-form"
@@ -21,6 +21,14 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
   Form,
   FormControl,
   FormField,
@@ -29,7 +37,7 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { formatCurrency } from "@/lib/utils"
-import { Plus, Trash2, Save, Send, X } from "lucide-react"
+import { Plus, Trash2, Save, Send, X, Clock } from "lucide-react"
 
 // Create conditional schemas based on user role
 const createGSOVoucherSchema = z.object({
@@ -60,14 +68,55 @@ type GSOFormData = z.infer<typeof createGSOVoucherSchema>
 type NonGSOFormData = z.infer<typeof createNonGSOVoucherSchema>
 type FormData = GSOFormData | NonGSOFormData
 
+interface PayeeOption {
+  id: string
+  name: string
+  address: string
+  status: "ACTIVE" | "INACTIVE"
+}
+
+interface TagOption {
+  id: string
+  name: string
+  status: "ACTIVE" | "INACTIVE"
+}
+
+interface ItemOption {
+  id: string
+  name: string
+  unit: string | null
+  defaultUnitPrice: number | null
+  status: "ACTIVE" | "INACTIVE"
+}
+
 export default function CreateVoucherPage() {
   const { data: session } = useSession()
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState("")
-  const [tagInput, setTagInput] = useState("")
   const [offices, setOffices] = useState<string[]>([])
   const [selectedOffice, setSelectedOffice] = useState("")
+  const [payees, setPayees] = useState<PayeeOption[]>([])
+  const [selectedPayeeId, setSelectedPayeeId] = useState<string>()
+  const [isPayeeDialogOpen, setIsPayeeDialogOpen] = useState(false)
+  const [newPayeeName, setNewPayeeName] = useState("")
+  const [newPayeeAddress, setNewPayeeAddress] = useState("")
+  const [payeeError, setPayeeError] = useState("")
+  const [isSavingPayee, setIsSavingPayee] = useState(false)
+  const [tagsDirectory, setTagsDirectory] = useState<TagOption[]>([])
+  const [selectedTagId, setSelectedTagId] = useState<string>()
+  const [isTagDialogOpen, setIsTagDialogOpen] = useState(false)
+  const [newTagName, setNewTagName] = useState("")
+  const [tagError, setTagError] = useState("")
+  const [isSavingTag, setIsSavingTag] = useState(false)
+  const [itemsDirectory, setItemsDirectory] = useState<ItemOption[]>([])
+  const [isItemDialogOpen, setIsItemDialogOpen] = useState(false)
+  const [newItemName, setNewItemName] = useState("")
+  const [newItemUnit, setNewItemUnit] = useState("")
+  const [newItemPrice, setNewItemPrice] = useState<number | "">("")
+  const [itemError, setItemError] = useState("")
+  const [isSavingItem, setIsSavingItem] = useState(false)
+  const [selectedItemIds, setSelectedItemIds] = useState<(string | undefined)[]>([])
 
   // Determine if user is GSO
   const isGSOUser = session?.user?.role === "GSO"
@@ -102,6 +151,318 @@ export default function CreateVoucherPage() {
     }
   })
 
+  const sortPayeeOptions = useCallback((list: PayeeOption[]) => {
+    return [...list].sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+    )
+  }, [])
+
+  const sortTagOptions = useCallback((list: TagOption[]) => {
+    return [...list].sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+    )
+  }, [])
+
+  const sortItemOptions = useCallback((list: ItemOption[]) => {
+    return [...list].sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+    )
+  }, [])
+
+  const loadPayees = useCallback(async () => {
+    try {
+      const response = await fetch("/api/payees?status=ACTIVE")
+      if (!response.ok) {
+        throw new Error("Failed to fetch payees")
+      }
+
+      const data = await response.json()
+      setPayees(sortPayeeOptions(data.payees ?? []))
+    } catch (error) {
+      console.error("Error fetching payees:", error)
+    }
+  }, [sortPayeeOptions])
+
+  const loadTags = useCallback(async () => {
+    try {
+      const response = await fetch("/api/tags?status=ACTIVE")
+      if (!response.ok) {
+        throw new Error("Failed to fetch tags")
+      }
+
+      const data = await response.json()
+      setTagsDirectory(sortTagOptions(data.tags ?? []))
+    } catch (error) {
+      console.error("Error fetching tags:", error)
+    }
+  }, [sortTagOptions])
+
+  const loadItems = useCallback(async () => {
+    try {
+      const response = await fetch("/api/items?status=ACTIVE")
+      if (!response.ok) {
+        throw new Error("Failed to fetch items")
+      }
+
+      const data = await response.json()
+      setItemsDirectory(sortItemOptions(data.items ?? []))
+    } catch (error) {
+      console.error("Error fetching items:", error)
+    }
+  }, [sortItemOptions])
+
+  const applyPayeeSelection = useCallback(
+    (payee: PayeeOption | null) => {
+      if (payee) {
+        setSelectedPayeeId(payee.id)
+        form.setValue("payee", payee.name, {
+          shouldDirty: true,
+          shouldValidate: true
+        })
+        form.setValue("address", payee.address, {
+          shouldDirty: true,
+          shouldValidate: true
+        })
+      } else {
+        setSelectedPayeeId(undefined)
+        form.setValue("payee", "", {
+          shouldDirty: true,
+          shouldValidate: true
+        })
+        form.setValue("address", "", {
+          shouldDirty: true,
+          shouldValidate: true
+        })
+      }
+    },
+    [form]
+  )
+
+  const handleClearPayeeSelection = useCallback(() => {
+    applyPayeeSelection(null)
+  }, [applyPayeeSelection])
+
+const handleCreatePayee = useCallback(async () => {
+    if (!newPayeeName.trim() || !newPayeeAddress.trim()) {
+      setPayeeError("Payee name and address are required")
+      return
+    }
+
+    setIsSavingPayee(true)
+    setPayeeError("")
+
+    try {
+      const response = await fetch("/api/payees", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          name: newPayeeName.trim(),
+          address: newPayeeAddress.trim(),
+          status: "ACTIVE"
+        })
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        setPayeeError(result.error || "Failed to create payee")
+        return
+      }
+
+      const createdPayee: PayeeOption = result.payee
+      setPayees(prev => sortPayeeOptions([...prev, createdPayee]))
+      applyPayeeSelection(createdPayee)
+
+      setNewPayeeName("")
+      setNewPayeeAddress("")
+      setIsPayeeDialogOpen(false)
+    } catch (error) {
+      console.error("Error creating payee:", error)
+      setPayeeError("Failed to create payee")
+    } finally {
+      setIsSavingPayee(false)
+    }
+  }, [
+    newPayeeName,
+    newPayeeAddress,
+    sortPayeeOptions,
+    applyPayeeSelection
+  ])
+
+const handleAddTagByName = useCallback(
+  (tagName: string) => {
+    if (!tagName) return
+    const currentTags = form.getValues("tags") ?? []
+    if (!currentTags.includes(tagName)) {
+      form.setValue("tags", [...currentTags, tagName], {
+        shouldDirty: true,
+        shouldValidate: true
+      })
+    }
+  },
+  [form]
+)
+
+const handleCreateTag = useCallback(async () => {
+    if (!newTagName.trim()) {
+      setTagError("Tag name is required")
+      return
+    }
+
+    setIsSavingTag(true)
+    setTagError("")
+
+    try {
+      const response = await fetch("/api/tags", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          name: newTagName.trim(),
+          status: "ACTIVE"
+        })
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        setTagError(result.error || "Failed to create tag")
+        return
+      }
+
+      const createdTag: TagOption = result.tag
+      setTagsDirectory(prev => sortTagOptions([...prev, createdTag]))
+      setNewTagName("")
+      setSelectedTagId(createdTag.id)
+      handleAddTagByName(createdTag.name)
+      setIsTagDialogOpen(false)
+    } catch (error) {
+      console.error("Error creating tag:", error)
+      setTagError("Failed to create tag")
+    } finally {
+      setIsSavingTag(false)
+    }
+}, [newTagName, sortTagOptions, handleAddTagByName])
+
+  const handleCreateItem = useCallback(async () => {
+    if (!newItemName.trim()) {
+      setItemError("Item name is required")
+      return
+    }
+
+    setIsSavingItem(true)
+    setItemError("")
+
+    try {
+      const response = await fetch("/api/items", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          name: newItemName.trim(),
+          unit: newItemUnit.trim() || undefined,
+          defaultUnitPrice:
+            newItemPrice === "" ? undefined : Number(newItemPrice),
+          status: "ACTIVE"
+        })
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        setItemError(result.error || "Failed to create item")
+        return
+      }
+
+      const createdItem: ItemOption = result.item
+      setItemsDirectory(prev => sortItemOptions([...prev, createdItem]))
+
+      setNewItemName("")
+      setNewItemUnit("")
+      setNewItemPrice("")
+      setItemError("")
+      setIsItemDialogOpen(false)
+    } catch (error) {
+      console.error("Error creating item:", error)
+      setItemError("Failed to create item")
+    } finally {
+      setIsSavingItem(false)
+    }
+}, [newItemName, newItemUnit, newItemPrice, sortItemOptions])
+
+const handleSelectExistingTag = useCallback(
+  (tagId: string | undefined) => {
+    if (!tagId) return
+    const tag = tagsDirectory.find(entry => entry.id === tagId)
+    if (!tag) return
+    setSelectedTagId(undefined)
+    handleAddTagByName(tag.name)
+  },
+  [tagsDirectory, handleAddTagByName]
+)
+
+const handleRemoveTag = useCallback(
+  (tagToRemove: string) => {
+    const currentTags = form.getValues("tags") ?? []
+    form.setValue(
+      "tags",
+      currentTags.filter(tag => tag !== tagToRemove),
+      { shouldDirty: true, shouldValidate: true }
+    )
+  },
+  [form]
+)
+
+const calculateItemTotal = useCallback((index: number) => {
+  const quantity = form.getValues(`items.${index}.quantity`) || 0
+  const unitPrice = form.getValues(`items.${index}.unitPrice`) || 0
+  const total = quantity * unitPrice
+  form.setValue(`items.${index}.totalPrice`, total)
+}, [form])
+
+const handleSelectItemFromDirectory = useCallback(
+  (index: number, itemId: string | undefined) => {
+    setSelectedItemIds(prev => {
+      const updated = [...prev]
+      updated[index] = itemId
+      return updated
+    })
+
+    if (!itemId) {
+      return
+    }
+
+    const item = itemsDirectory.find(entry => entry.id === itemId)
+    if (!item) {
+      return
+    }
+
+    form.setValue(`items.${index}.description`, item.name, {
+      shouldDirty: true,
+      shouldValidate: true
+    })
+
+    form.setValue(`items.${index}.unit`, item.unit ?? "", {
+      shouldDirty: true,
+      shouldValidate: true
+    })
+
+    if (typeof item.defaultUnitPrice === "number") {
+      form.setValue(`items.${index}.unitPrice`, item.defaultUnitPrice, {
+        shouldDirty: true,
+        shouldValidate: true
+      })
+    }
+
+    setTimeout(() => calculateItemTotal(index), 0)
+  },
+  [itemsDirectory, form, calculateItemTotal]
+)
+
   const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: "items" as any
@@ -115,13 +476,6 @@ export default function CreateVoucherPage() {
     ? (watchedItems || []).reduce((sum: number, item: any) => sum + (item.totalPrice || 0), 0)
     : watchedAmount || 0
 
-  const calculateItemTotal = (index: number) => {
-    const quantity = form.getValues(`items.${index}.quantity`) || 0
-    const unitPrice = form.getValues(`items.${index}.unitPrice`) || 0
-    const total = quantity * unitPrice
-    form.setValue(`items.${index}.totalPrice`, total)
-  }
-
   const addItem = () => {
     append({
       description: "",
@@ -130,27 +484,14 @@ export default function CreateVoucherPage() {
       unitPrice: 0,
       totalPrice: 0
     })
+    setSelectedItemIds(prev => [...prev, undefined])
   }
 
   const removeItem = (index: number) => {
     if (fields.length > 1) {
       remove(index)
+      setSelectedItemIds(prev => prev.filter((_, idx) => idx !== index))
     }
-  }
-
-  const addTag = () => {
-    if (tagInput.trim()) {
-      const currentTags = form.getValues("tags")
-      if (!currentTags.includes(tagInput.trim())) {
-        form.setValue("tags", [...currentTags, tagInput.trim()])
-      }
-      setTagInput("")
-    }
-  }
-
-  const removeTag = (tagToRemove: string) => {
-    const currentTags = form.getValues("tags")
-    form.setValue("tags", currentTags.filter(tag => tag !== tagToRemove))
   }
 
   const addSourceOffice = () => {
@@ -168,8 +509,25 @@ export default function CreateVoucherPage() {
     form.setValue("sourceOffice", currentOffices.filter(office => office !== officeToRemove))
   }
 
+  useEffect(() => {
+    setSelectedItemIds(prev => {
+      const updated = [...prev]
+      if (updated.length < fields.length) {
+        return [...updated, ...Array(fields.length - updated.length).fill(undefined)]
+      }
+      if (updated.length > fields.length) {
+        return updated.slice(0, fields.length)
+      }
+      return updated
+    })
+  }, [fields.length])
+
   // Fetch offices on component mount
   useEffect(() => {
+    loadPayees()
+    loadTags()
+    loadItems()
+
     const fetchOffices = async () => {
       try {
         const response = await fetch("/api/departments")
@@ -183,7 +541,45 @@ export default function CreateVoucherPage() {
     }
 
     fetchOffices()
-  }, [])
+  }, [loadPayees, loadTags, loadItems])
+
+  const extractErrorMessage = async (response: Response) => {
+    try {
+      const text = await response.text()
+      if (!text) {
+        return response.statusText || "An unexpected error occurred"
+      }
+
+      const parsed = JSON.parse(text)
+
+      if (Array.isArray(parsed?.details)) {
+        return parsed.details
+          .map((detail: { message?: string }) => detail?.message)
+          .filter(Boolean)
+          .join(", ") || parsed.error || response.statusText
+      }
+
+      if (Array.isArray(parsed)) {
+        return parsed
+          .map((detail: { message?: string }) => detail?.message)
+          .filter(Boolean)
+          .join(", ") || response.statusText
+      }
+
+      if (typeof parsed === "object") {
+        return (
+          parsed.error ||
+          parsed.message ||
+          response.statusText ||
+          "An unexpected error occurred"
+        )
+      }
+
+      return text
+    } catch {
+      return response.statusText || "An unexpected error occurred"
+    }
+  }
 
   const onSubmit = async (data: FormData, isDraft = false) => {
     setIsSubmitting(true)
@@ -215,8 +611,8 @@ export default function CreateVoucherPage() {
       })
 
       if (!createResponse.ok) {
-        const errorData = await createResponse.json()
-        setError(errorData.error || "Failed to create voucher")
+        const message = await extractErrorMessage(createResponse)
+        setError(message || "Failed to create voucher")
         return
       }
 
@@ -232,15 +628,20 @@ export default function CreateVoucherPage() {
         })
 
         if (!submitResponse.ok) {
-          const errorData = await submitResponse.json()
-          setError(errorData.error || "Failed to submit voucher for review")
+          const message = await extractErrorMessage(submitResponse)
+          setError(message || "Failed to submit voucher for review")
           return
         }
       }
 
       router.push(`/disbursements/${result.id}`)
-    } catch {
-      setError("An error occurred while processing the voucher")
+    } catch (error) {
+      console.error("Error processing voucher:", error)
+      setError(
+        error instanceof Error
+          ? error.message
+          : "An unexpected error occurred while processing the voucher"
+      )
     } finally {
       setIsSubmitting(false)
     }
@@ -297,7 +698,84 @@ export default function CreateVoucherPage() {
                       <FormItem>
                         <FormLabel>Payee *</FormLabel>
                         <FormControl>
-                          <Input placeholder="Enter payee name" {...field} />
+                          <div className="flex flex-col gap-2">
+                            <div className="flex flex-col gap-2 md:flex-row md:items-start">
+                              <Select
+                                value={selectedPayeeId ?? undefined}
+                                onValueChange={(value) => {
+                                  const selected = payees.find(payee => payee.id === value)
+                                  if (selected) {
+                                    applyPayeeSelection(selected)
+                                    field.onChange(selected.name)
+                                  }
+                                }}
+                                disabled={payees.length === 0}
+                              >
+                                <SelectTrigger className="w-full border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 bg-white shadow-sm">
+                                  <SelectValue
+                                    placeholder={
+                                      payees.length === 0
+                                        ? "No payees available"
+                                        : "Select payee"
+                                    }
+                                  />
+                                </SelectTrigger>
+                                <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-md max-h-60 overflow-y-auto">
+                                  {payees.length === 0 ? (
+                                    <SelectItem value="__empty" disabled className="text-sm">
+                                      No payees available
+                                    </SelectItem>
+                                  ) : (
+                                    payees.map(payee => (
+                                      <SelectItem
+                                        key={payee.id}
+                                        value={payee.id}
+                                        className="text-sm md:text-base py-2"
+                                      >
+                                        <div className="flex items-center justify-between w-full">
+                                          <span className="font-medium text-gray-900">
+                                            {payee.name}
+                                          </span>
+                                        </div>
+                                      </SelectItem>
+                                    ))
+                                  )}
+                                </SelectContent>
+                              </Select>
+                              <div className="flex gap-2 flex-wrap md:flex-nowrap">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setPayeeError("")
+                                    setIsPayeeDialogOpen(true)
+                                  }}
+                                >
+                                  <Plus className="mr-2 h-4 w-4" />
+                                  New Payee
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    handleClearPayeeSelection()
+                                    field.onChange("")
+                                  }}
+                                  disabled={!selectedPayeeId && !field.value}
+                                >
+                                  <X className="mr-2 h-4 w-4" />
+                                  Clear
+                                </Button>
+                              </div>
+                            </div>
+                            {payees.length === 0 && (
+                              <p className="text-xs text-gray-500">
+                                No payees found. Add a new payee to get started.
+                              </p>
+                            )}
+                          </div>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -311,7 +789,11 @@ export default function CreateVoucherPage() {
                       <FormItem>
                         <FormLabel>Address *</FormLabel>
                         <FormControl>
-                          <Input placeholder="Enter payee address" {...field} />
+                          <Input
+                            placeholder="Select a payee to auto-fill address"
+                            readOnly
+                            {...field}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -342,16 +824,66 @@ export default function CreateVoucherPage() {
                   <div>
                     <FormLabel>Tags</FormLabel>
                     <div className="space-y-2">
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder="Add a tag"
-                          value={tagInput}
-                          onChange={(e) => setTagInput(e.target.value)}
-                          onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
-                        />
-                        <Button type="button" onClick={addTag} variant="outline" size="sm">
-                          <Plus className="h-4 w-4" />
-                        </Button>
+                      <div className="flex flex-col gap-2 md:flex-row md:items-start">
+                        <Select
+                          value={selectedTagId ?? undefined}
+                          onValueChange={(value) => handleSelectExistingTag(value)}
+                          disabled={tagsDirectory.length === 0}
+                        >
+                          <SelectTrigger className="w-full border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 bg-white shadow-sm">
+                            <SelectValue
+                              placeholder={
+                                tagsDirectory.length === 0
+                                  ? "No tags available"
+                                  : "Select tag"
+                              }
+                            />
+                          </SelectTrigger>
+                          <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-md max-h-60 overflow-y-auto">
+                            {tagsDirectory.length === 0 ? (
+                              <SelectItem value="__empty" disabled className="text-sm">
+                                No tags available
+                              </SelectItem>
+                            ) : (
+                              tagsDirectory.map(tag => (
+                                <SelectItem
+                                  key={tag.id}
+                                  value={tag.id}
+                                  className="text-sm md:text-base py-2"
+                                >
+                                  <span className="font-medium text-gray-900">
+                                    {tag.name}
+                                  </span>
+                                </SelectItem>
+                              ))
+                            )}
+                          </SelectContent>
+                        </Select>
+                        <div className="flex gap-2 flex-wrap md:flex-nowrap">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setTagError("")
+                              setNewTagName("")
+                              setIsTagDialogOpen(true)
+                            }}
+                          >
+                            <Plus className="mr-2 h-4 w-4" />
+                            New Tag
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setSelectedTagId(undefined)}
+                            disabled={!selectedTagId}
+                          >
+                            <X className="mr-2 h-4 w-4" />
+                            Clear
+                          </Button>
+                        </div>
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {(form.watch("tags" as any) || []).map((tag: string, index: number) => (
@@ -362,7 +894,7 @@ export default function CreateVoucherPage() {
                               variant="ghost"
                               size="sm"
                               className="h-4 w-4 p-0 hover:bg-blue-200"
-                              onClick={() => removeTag(tag)}
+                              onClick={() => handleRemoveTag(tag)}
                             >
                               <X className="h-3 w-3" />
                             </Button>
@@ -518,6 +1050,77 @@ export default function CreateVoucherPage() {
                         )}
                       </div>
 
+                      <div className="flex flex-col gap-2 md:flex-row md:items-start">
+                        <Select
+                          value={selectedItemIds[index] ?? undefined}
+                          onValueChange={(value) => handleSelectItemFromDirectory(index, value)}
+                          disabled={itemsDirectory.length === 0}
+                        >
+                          <SelectTrigger className="w-full md:w-72 border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 bg-white shadow-sm">
+                            <SelectValue
+                              placeholder={
+                                itemsDirectory.length === 0
+                                  ? "No items available"
+                                  : "Select item template"
+                              }
+                            />
+                          </SelectTrigger>
+                          <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-md max-h-60 overflow-y-auto">
+                            {itemsDirectory.length === 0 ? (
+                              <SelectItem value="__empty" disabled className="text-sm">
+                                No items available
+                              </SelectItem>
+                            ) : (
+                              itemsDirectory.map(item => (
+                                <SelectItem
+                                  key={item.id}
+                                  value={item.id}
+                                  className="text-sm md:text-base py-2"
+                                >
+                                  <div className="flex flex-col">
+                                    <span className="font-medium text-gray-900">
+                                      {item.name}
+                                    </span>
+                                    {item.unit && (
+                                      <span className="text-xs text-gray-500">
+                                        Unit: {item.unit}
+                                      </span>
+                                    )}
+                                  </div>
+                                </SelectItem>
+                              ))
+                            )}
+                          </SelectContent>
+                        </Select>
+                        <div className="flex gap-2 flex-wrap md:flex-nowrap">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setItemError("")
+                              setNewItemName("")
+                              setNewItemUnit("")
+                              setNewItemPrice("")
+                              setIsItemDialogOpen(true)
+                            }}
+                          >
+                            <Plus className="mr-2 h-4 w-4" />
+                            New Item Template
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleSelectItemFromDirectory(index, undefined)}
+                            disabled={!selectedItemIds[index]}
+                          >
+                            <X className="mr-2 h-4 w-4" />
+                            Clear
+                          </Button>
+                        </div>
+                      </div>
+
                       <FormField
                         control={form.control}
                         name={`items.${index}.description` as any}
@@ -658,13 +1261,262 @@ export default function CreateVoucherPage() {
                 <Save className="mr-2 h-4 w-4" />
                 Save as Draft
               </Button>
-              <Button type="submit" disabled={isSubmitting}>
+              <Button
+                type="submit"
+                disabled={isSubmitting}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg disabled:bg-indigo-300 disabled:text-white disabled:shadow-none px-6 py-3 text-sm md:text-base font-semibold transition-transform duration-150 hover:-translate-y-0.5"
+              >
                 <Send className="mr-2 h-4 w-4" />
-                Submit for Review
+                {isSubmitting ? "Submitting..." : "Submit for Review"}
               </Button>
             </div>
           </form>
         </Form>
+
+        <Dialog
+          open={isPayeeDialogOpen}
+          onOpenChange={(open) => {
+            setIsPayeeDialogOpen(open)
+            if (!open) {
+              setNewPayeeName("")
+              setNewPayeeAddress("")
+              setPayeeError("")
+            }
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add New Payee</DialogTitle>
+              <DialogDescription>
+                Create a reusable payee entry. Selecting this payee will
+                automatically fill in the address for future vouchers.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-2">
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Payee Name *
+                </label>
+                <Input
+                  value={newPayeeName}
+                  onChange={(event) => setNewPayeeName(event.target.value)}
+                  placeholder="e.g., ABC Trading"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Address *
+                </label>
+                <Textarea
+                  value={newPayeeAddress}
+                  onChange={(event) => setNewPayeeAddress(event.target.value)}
+                  placeholder="Enter the payee's complete address"
+                  rows={3}
+                />
+              </div>
+
+              {payeeError && (
+                <p className="text-sm text-red-600">{payeeError}</p>
+              )}
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setIsPayeeDialogOpen(false)
+                  setNewPayeeName("")
+                  setNewPayeeAddress("")
+                  setPayeeError("")
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={handleCreatePayee}
+                disabled={isSavingPayee}
+              >
+                {isSavingPayee ? (
+                  <>
+                    <Clock className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    Save Payee
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
+          open={isTagDialogOpen}
+          onOpenChange={(open) => {
+            setIsTagDialogOpen(open)
+            if (!open) {
+              setNewTagName("")
+              setTagError("")
+            }
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add New Tag</DialogTitle>
+              <DialogDescription>
+                Create a reusable tag that can be applied to vouchers.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-2">
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Tag Name *
+                </label>
+                <Input
+                  value={newTagName}
+                  onChange={(event) => setNewTagName(event.target.value)}
+                  placeholder="e.g., Procurement"
+                />
+              </div>
+              {tagError && <p className="text-sm text-red-600">{tagError}</p>}
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setIsTagDialogOpen(false)
+                  setNewTagName("")
+                  setTagError("")
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={handleCreateTag}
+                disabled={isSavingTag}
+              >
+                {isSavingTag ? (
+                  <>
+                    <Clock className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    Save Tag
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
+          open={isItemDialogOpen}
+          onOpenChange={(open) => {
+            setIsItemDialogOpen(open)
+            if (!open) {
+              setNewItemName("")
+              setNewItemUnit("")
+              setNewItemPrice("")
+              setItemError("")
+            }
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add New Item Template</DialogTitle>
+              <DialogDescription>
+                Create a reusable item template with optional default unit and price.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-2">
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Item Name *
+                </label>
+                <Input
+                  value={newItemName}
+                  onChange={(event) => setNewItemName(event.target.value)}
+                  placeholder="e.g., Printer Ink"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Unit (Optional)
+                </label>
+                <Input
+                  value={newItemUnit}
+                  onChange={(event) => setNewItemUnit(event.target.value)}
+                  placeholder="e.g., box, piece"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Default Unit Price (Optional)
+                </label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={newItemPrice === "" ? "" : newItemPrice}
+                  onChange={(event) =>
+                    setNewItemPrice(event.target.value === "" ? "" : Number(event.target.value))
+                  }
+                  placeholder="Enter default unit price"
+                />
+              </div>
+
+              {itemError && <p className="text-sm text-red-600">{itemError}</p>}
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setIsItemDialogOpen(false)
+                  setNewItemName("")
+                  setNewItemUnit("")
+                  setNewItemPrice("")
+                  setItemError("")
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={handleCreateItem}
+                disabled={isSavingItem}
+              >
+                {isSavingItem ? (
+                  <>
+                    <Clock className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    Save Item
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </MainLayout>
   )
