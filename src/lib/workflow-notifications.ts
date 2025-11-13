@@ -11,6 +11,7 @@ interface NotificationData {
   disbursementCreatedBy: UserRole
   remarks?: string
   checkNumber?: string
+  releaseRecipient?: string
 }
 
 export async function sendWorkflowNotifications(data: NotificationData) {
@@ -152,7 +153,7 @@ function createNotificationMessage(data: NotificationData): string {
       return `Check #${checkNumber} has been issued for disbursement "${payee}" (${formattedAmount}) by Treasury Office (${performedBy})`
       
     case "MARK_RELEASED":
-      return `Disbursement voucher "${payee}" (${formattedAmount}) has been released by Treasury Office (${performedBy})`
+      return `Disbursement voucher "${payee}" (${formattedAmount}) has been released to ${data.releaseRecipient ?? "the recipient"} by Treasury Office (${performedBy})`
       
     default:
       return `Disbursement voucher "${payee}" (${formattedAmount}) status updated by ${performedBy} (${performedByRole.replace("_", " ")})`

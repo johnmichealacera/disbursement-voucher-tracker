@@ -285,7 +285,7 @@ export default function AdminUsersPage() {
                 Add User
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[480px]">
               <DialogHeader>
                 <DialogTitle>Create New User</DialogTitle>
                 <DialogDescription>
@@ -293,7 +293,10 @@ export default function AdminUsersPage() {
                 </DialogDescription>
               </DialogHeader>
               <Form {...form}>
-                <form onSubmit={form.handleSubmit(handleCreateUser)} className="space-y-4">
+                <form
+                  onSubmit={form.handleSubmit(handleCreateUser)}
+                  className="space-y-4"
+                >
                   <FormField
                     control={form.control}
                     name="name"
@@ -339,16 +342,31 @@ export default function AdminUsersPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Role *</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                        >
                           <FormControl>
-                            <SelectTrigger>
+                            <SelectTrigger className="h-11 border border-gray-200 bg-white shadow-sm hover:border-blue-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200">
                               <SelectValue placeholder="Select a role" />
                             </SelectTrigger>
                           </FormControl>
-                          <SelectContent>
+                          <SelectContent className="bg-white border border-gray-100 shadow-xl rounded-xl overflow-hidden p-2 space-y-1">
                             {Object.entries(roleLabels).map(([value, label]) => (
-                              <SelectItem key={value} value={value}>
-                                {label}
+                              <SelectItem
+                                key={value}
+                                value={value}
+                                className="rounded-lg px-3 py-2 data-[highlighted=true]:bg-blue-50 data-[highlighted=true]:text-blue-700"
+                              >
+                                <div className="flex items-center justify-between gap-3">
+                                  <span className="font-medium text-gray-800">{label}</span>
+                                  <Badge
+                                    variant="secondary"
+                                    className={`${roleColors[value as keyof typeof roleColors]} px-2 py-0.5 text-xs font-semibold`}
+                                  >
+                                    {value}
+                                  </Badge>
+                                </div>
                               </SelectItem>
                             ))}
                           </SelectContent>

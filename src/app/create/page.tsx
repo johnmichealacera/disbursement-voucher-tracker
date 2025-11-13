@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { useForm, useFieldArray } from "react-hook-form"
@@ -37,7 +37,7 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { formatCurrency } from "@/lib/utils"
-import { Plus, Trash2, Save, Send, X, Clock } from "lucide-react"
+import { Plus, Trash2, Save, Send, X, Clock, Search } from "lucide-react"
 
 // Create conditional schemas based on user role
 const createGSOVoucherSchema = z.object({
@@ -117,6 +117,9 @@ export default function CreateVoucherPage() {
   const [itemError, setItemError] = useState("")
   const [isSavingItem, setIsSavingItem] = useState(false)
   const [selectedItemIds, setSelectedItemIds] = useState<(string | undefined)[]>([])
+  const [payeeSearchTerm, setPayeeSearchTerm] = useState("")
+  const [tagSearchTerm, setTagSearchTerm] = useState("")
+  const [itemSearchTerm, setItemSearchTerm] = useState("")
 
   // Determine if user is GSO
   const isGSOUser = session?.user?.role === "GSO"
@@ -167,6 +170,80 @@ export default function CreateVoucherPage() {
       a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
     )
   }, [])
+
+  const filteredPayees = useMemo(() => {
+    const term = payeeSearchTerm.trim().toLowerCase()
+    const matches = term
+      ? payees.filter((payee) =>
+          payee.name.toLowerCase().includes(term) ||
+          payee.address.toLowerCase().includes(term)
+        )
+      : payees
+
+    let options = matches
+
+    if (selectedPayeeId) {
+      const selected = payees.find((payee) => payee.id === selectedPayeeId)
+      if (selected && !options.some((payee) => payee.id === selectedPayeeId)) {
+        options = [selected, ...options]
+      }
+    }
+
+    return {
+      options,
+      hasMatches: matches.length > 0
+    }
+  }, [payees, payeeSearchTerm, selectedPayeeId])
+
+  const filteredTags = useMemo(() => {
+    const term = tagSearchTerm.trim().toLowerCase()
+    const matches = term
+      ? tagsDirectory.filter((tag) =>
+          tag.name.toLowerCase().includes(term)
+        )
+      : tagsDirectory
+
+    let options = matches
+
+    if (selectedTagId) {
+      const selected = tagsDirectory.find((tag) => tag.id === selectedTagId)
+      if (selected && !options.some((tag) => tag.id === selectedTagId)) {
+        options = [selected, ...options]
+      }
+    }
+
+    return {
+      options,
+      hasMatches: matches.length > 0
+    }
+  }, [tagsDirectory, tagSearchTerm, selectedTagId])
+
+  const filteredItems = useMemo(() => {
+    const term = itemSearchTerm.trim().toLowerCase()
+    const matches = term
+      ? itemsDirectory.filter((item) => {
+          const unit = item.unit ?? ""
+          return (
+            item.name.toLowerCase().includes(term) ||
+            unit.toLowerCase().includes(term)
+          )
+        })
+      : itemsDirectory
+
+    const selectedItems = selectedItemIds
+      .map((id) => itemsDirectory.find((item) => item.id === id))
+      .filter((item): item is ItemOption => Boolean(item))
+
+    const combined = [...selectedItems, ...matches].filter(
+      (item, index, self) =>
+        self.findIndex((other) => other.id === item.id) === index
+    )
+
+    return {
+      options: combined,
+      hasMatches: matches.length > 0
+    }
+  }, [itemsDirectory, itemSearchTerm, selectedItemIds])
 
   const loadPayees = useCallback(async () => {
     try {
@@ -697,86 +774,111 @@ const handleSelectItemFromDirectory = useCallback(
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Payee *</FormLabel>
-                        <FormControl>
-                          <div className="flex flex-col gap-2">
-                            <div className="flex flex-col gap-2 md:flex-row md:items-start">
-                              <Select
-                                value={selectedPayeeId ?? undefined}
-                                onValueChange={(value) => {
-                                  const selected = payees.find(payee => payee.id === value)
-                                  if (selected) {
-                                    applyPayeeSelection(selected)
-                                    field.onChange(selected.name)
+                        <div className="flex flex-col gap-2 md:flex-row md:items-start">
+                          <FormControl>
+                            <Select
+                              value={selectedPayeeId ?? undefined}
+                              onValueChange={(value) => {
+                                const selected = payees.find(payee => payee.id === value)
+                                if (selected) {
+                                  applyPayeeSelection(selected)
+                                  field.onChange(selected.name)
+                                }
+                              }}
+                              disabled={payees.length === 0}
+                              onOpenChange={(open) => {
+                                if (!open) {
+                                  setPayeeSearchTerm("")
+                                }
+                              }}
+                            >
+                              <SelectTrigger className="w-full border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 bg-white shadow-sm">
+                                <SelectValue
+                                  placeholder={
+                                    payees.length === 0
+                                      ? "No payees available"
+                                      : "Select payee"
                                   }
-                                }}
-                                disabled={payees.length === 0}
-                              >
-                                <SelectTrigger className="w-full border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 bg-white shadow-sm">
-                                  <SelectValue
-                                    placeholder={
-                                      payees.length === 0
-                                        ? "No payees available"
-                                        : "Select payee"
-                                    }
-                                  />
-                                </SelectTrigger>
-                                <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-md max-h-60 overflow-y-auto">
-                                  {payees.length === 0 ? (
-                                    <SelectItem value="__empty" disabled className="text-sm">
-                                      No payees available
-                                    </SelectItem>
-                                  ) : (
-                                    payees.map(payee => (
+                                />
+                              </SelectTrigger>
+                              <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-md max-h-60 overflow-y-auto">
+                                {payees.length === 0 ? (
+                                  <SelectItem value="__empty" disabled className="text-sm">
+                                    No payees available
+                                  </SelectItem>
+                                ) : (
+                                  <>
+                                    <div className="px-3 pb-2 pt-3">
+                                      <div className="relative">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                        <Input
+                                          value={payeeSearchTerm}
+                                          onChange={(event) => setPayeeSearchTerm(event.target.value)}
+                                          onKeyDown={(event) => event.stopPropagation()}
+                                          placeholder="Search payees..."
+                                          className="pl-9 h-9 border-gray-200 focus-visible:ring-blue-500"
+                                        />
+                                      </div>
+                                    </div>
+                                    {payeeSearchTerm.trim() && !filteredPayees.hasMatches && (
+                                      <SelectItem value="__no_payee_match" disabled className="text-sm italic text-gray-500">
+                                        No matching payees
+                                      </SelectItem>
+                                    )}
+                                    {filteredPayees.options.map(payee => (
                                       <SelectItem
                                         key={payee.id}
                                         value={payee.id}
                                         className="text-sm md:text-base py-2"
                                       >
-                                        <div className="flex items-center justify-between w-full">
+                                        <div className="flex flex-col">
                                           <span className="font-medium text-gray-900">
                                             {payee.name}
                                           </span>
+                                          <span className="text-xs text-gray-500">
+                                            {payee.address}
+                                          </span>
                                         </div>
                                       </SelectItem>
-                                    ))
-                                  )}
-                                </SelectContent>
-                              </Select>
-                              <div className="flex gap-2 flex-wrap md:flex-nowrap">
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    setPayeeError("")
-                                    setIsPayeeDialogOpen(true)
-                                  }}
-                                >
-                                  <Plus className="mr-2 h-4 w-4" />
-                                  New Payee
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => {
-                                    handleClearPayeeSelection()
-                                    field.onChange("")
-                                  }}
-                                  disabled={!selectedPayeeId && !field.value}
-                                >
-                                  <X className="mr-2 h-4 w-4" />
-                                  Clear
-                                </Button>
-                              </div>
-                            </div>
-                            {payees.length === 0 && (
-                              <p className="text-xs text-gray-500">
-                                No payees found. Add a new payee to get started.
-                              </p>
-                            )}
+                                    ))}
+                                  </>
+                                )}
+                              </SelectContent>
+                            </Select>
+                          </FormControl>
+                          <div className="flex gap-2 flex-wrap md:flex-nowrap">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setPayeeError("")
+                                setIsPayeeDialogOpen(true)
+                              }}
+                            >
+                              <Plus className="mr-2 h-4 w-4" />
+                              New Payee
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                handleClearPayeeSelection()
+                                field.onChange("")
+                              }}
+                              disabled={!selectedPayeeId && !field.value}
+                            >
+                              <X className="mr-2 h-4 w-4" />
+                              Clear
+                            </Button>
                           </div>
-                        </FormControl>
+                        </div>
+                        {payees.length === 0 && (
+                          <p className="text-xs text-gray-500">
+                            No payees found. Add a new payee to get started.
+                          </p>
+                        )}
                         <FormMessage />
                       </FormItem>
                     )}
@@ -825,66 +927,90 @@ const handleSelectItemFromDirectory = useCallback(
                     <FormLabel>Tags</FormLabel>
                     <div className="space-y-2">
                       <div className="flex flex-col gap-2 md:flex-row md:items-start">
-                        <Select
-                          value={selectedTagId ?? undefined}
-                          onValueChange={(value) => handleSelectExistingTag(value)}
-                          disabled={tagsDirectory.length === 0}
-                        >
-                          <SelectTrigger className="w-full border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 bg-white shadow-sm">
-                            <SelectValue
-                              placeholder={
-                                tagsDirectory.length === 0
-                                  ? "No tags available"
-                                  : "Select tag"
+                          <Select
+                            value={selectedTagId ?? undefined}
+                            onValueChange={(value) => handleSelectExistingTag(value)}
+                            disabled={tagsDirectory.length === 0}
+                            onOpenChange={(open) => {
+                              if (!open) {
+                                setTagSearchTerm("")
                               }
-                            />
-                          </SelectTrigger>
-                          <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-md max-h-60 overflow-y-auto">
-                            {tagsDirectory.length === 0 ? (
-                              <SelectItem value="__empty" disabled className="text-sm">
-                                No tags available
-                              </SelectItem>
-                            ) : (
-                              tagsDirectory.map(tag => (
-                                <SelectItem
-                                  key={tag.id}
-                                  value={tag.id}
-                                  className="text-sm md:text-base py-2"
-                                >
-                                  <span className="font-medium text-gray-900">
-                                    {tag.name}
-                                  </span>
-                                </SelectItem>
-                              ))
-                            )}
-                          </SelectContent>
-                        </Select>
-                        <div className="flex gap-2 flex-wrap md:flex-nowrap">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setTagError("")
-                              setNewTagName("")
-                              setIsTagDialogOpen(true)
                             }}
                           >
-                            <Plus className="mr-2 h-4 w-4" />
-                            New Tag
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setSelectedTagId(undefined)}
-                            disabled={!selectedTagId}
-                          >
-                            <X className="mr-2 h-4 w-4" />
-                            Clear
-                        </Button>
+                            <SelectTrigger className="w-full border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 bg-white shadow-sm">
+                              <SelectValue
+                                placeholder={
+                                  tagsDirectory.length === 0
+                                    ? "No tags available"
+                                    : "Select tag"
+                                }
+                              />
+                            </SelectTrigger>
+                            <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-md max-h-60 overflow-y-auto">
+                              {tagsDirectory.length === 0 ? (
+                                <SelectItem value="__empty" disabled className="text-sm">
+                                  No tags available
+                                </SelectItem>
+                              ) : (
+                                <>
+                                  <div className="px-3 pb-2 pt-3">
+                                    <div className="relative">
+                                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                      <Input
+                                        value={tagSearchTerm}
+                                        onChange={(event) => setTagSearchTerm(event.target.value)}
+                                        onKeyDown={(event) => event.stopPropagation()}
+                                        placeholder="Search tags..."
+                                        className="pl-9 h-9 border-gray-200 focus-visible:ring-blue-500"
+                                      />
+                                    </div>
+                                  </div>
+                                  {tagSearchTerm.trim() && !filteredTags.hasMatches && (
+                                    <SelectItem value="__no_tag_match" disabled className="text-sm italic text-gray-500">
+                                      No matching tags
+                                    </SelectItem>
+                                  )}
+                                  {filteredTags.options.map(tag => (
+                                    <SelectItem
+                                      key={tag.id}
+                                      value={tag.id}
+                                      className="text-sm md:text-base py-2"
+                                    >
+                                      <span className="font-medium text-gray-900">
+                                        {tag.name}
+                                      </span>
+                                    </SelectItem>
+                                  ))}
+                                </>
+                              )}
+                            </SelectContent>
+                          </Select>
+                          <div className="flex gap-2 flex-wrap md:flex-nowrap">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setTagError("")
+                                setNewTagName("")
+                                setIsTagDialogOpen(true)
+                              }}
+                            >
+                              <Plus className="mr-2 h-4 w-4" />
+                              New Tag
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setSelectedTagId(undefined)}
+                              disabled={!selectedTagId}
+                            >
+                              <X className="mr-2 h-4 w-4" />
+                              Clear
+                            </Button>
+                          </div>
                         </div>
-                      </div>
                       <div className="flex flex-wrap gap-2">
                         {(form.watch("tags" as any) || []).map((tag: string, index: number) => (
                           <div key={index} className="flex items-center gap-1 bg-blue-100 text-blue-800 px-2 py-1 rounded-md text-sm">
@@ -1055,6 +1181,11 @@ const handleSelectItemFromDirectory = useCallback(
                           value={selectedItemIds[index] ?? undefined}
                           onValueChange={(value) => handleSelectItemFromDirectory(index, value)}
                           disabled={itemsDirectory.length === 0}
+                          onOpenChange={(open) => {
+                            if (!open) {
+                              setItemSearchTerm("")
+                            }
+                          }}
                         >
                           <SelectTrigger className="w-full md:w-72 border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 bg-white shadow-sm">
                             <SelectValue
@@ -1071,24 +1202,43 @@ const handleSelectItemFromDirectory = useCallback(
                                 No items available
                               </SelectItem>
                             ) : (
-                              itemsDirectory.map(item => (
-                                <SelectItem
-                                  key={item.id}
-                                  value={item.id}
-                                  className="text-sm md:text-base py-2"
-                                >
-                                  <div className="flex flex-col">
-                                    <span className="font-medium text-gray-900">
-                                      {item.name}
-                                    </span>
-                                    {item.unit && (
-                                      <span className="text-xs text-gray-500">
-                                        Unit: {item.unit}
-                                      </span>
-                                    )}
+                              <>
+                                <div className="px-3 pb-2 pt-3">
+                                  <div className="relative">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                    <Input
+                                      value={itemSearchTerm}
+                                      onChange={(event) => setItemSearchTerm(event.target.value)}
+                                      onKeyDown={(event) => event.stopPropagation()}
+                                      placeholder="Search items..."
+                                      className="pl-9 h-9 border-gray-200 focus-visible:ring-blue-500"
+                                    />
                                   </div>
-                                </SelectItem>
-                              ))
+                                </div>
+                                {itemSearchTerm.trim() && !filteredItems.hasMatches && (
+                                  <SelectItem value="__no_item_match" disabled className="text-sm italic text-gray-500">
+                                    No matching items
+                                  </SelectItem>
+                                )}
+                                {filteredItems.options.map(item => (
+                                  <SelectItem
+                                    key={item.id}
+                                    value={item.id}
+                                    className="text-sm md:text-base py-2"
+                                  >
+                                    <div className="flex flex-col">
+                                      <span className="font-medium text-gray-900">
+                                        {item.name}
+                                      </span>
+                                      {item.unit && (
+                                        <span className="text-xs text-gray-500">
+                                          Unit: {item.unit}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                              </>
                             )}
                           </SelectContent>
                         </Select>

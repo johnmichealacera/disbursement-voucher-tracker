@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useMemo, useCallback } from "react"
+import { useEffect, useState, useMemo, useCallback, ReactNode } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter, useParams } from "next/navigation"
 import { MainLayout } from "@/components/layout/main-layout"
@@ -41,6 +41,7 @@ import {
   Send, 
   Edit, 
   FileText, 
+  FileSignature,
   User, 
   Calendar, 
   Banknote,
@@ -51,6 +52,7 @@ import {
   AlertCircle,
   Eye,
   MessageSquare,
+  Wallet,
   Plus,
   X
 } from "lucide-react"
@@ -104,6 +106,9 @@ interface Disbursement {
   sourceOffice: string[]
   status: string
   remarks?: string
+  checkNumber?: string | null
+  releaseDate?: string | null
+  releaseRecipient?: string | null
   createdAt: string
   updatedAt: string
   createdBy: User
@@ -141,6 +146,7 @@ export default function DisbursementDetailPage() {
   const [availableOffices, setAvailableOffices] = useState<string[]>([])
   const [isSubmittingRemarks, setIsSubmittingRemarks] = useState(false)
   const [checkNumber, setCheckNumber] = useState("")
+  const [treasuryReleaseRecipient, setTreasuryReleaseRecipient] = useState("")
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [deletePassword, setDeletePassword] = useState("")
@@ -151,6 +157,23 @@ export default function DisbursementDetailPage() {
   const [treasuryPasswordError, setTreasuryPasswordError] = useState("")
   const [showTreasuryDialog, setShowTreasuryDialog] = useState(false)
   const [treasuryAction, setTreasuryAction] = useState<"CHECK_ISSUANCE" | "MARK_RELEASED" | null>(null)
+
+  useEffect(() => {
+    if (disbursement?.releaseRecipient) {
+      setTreasuryReleaseRecipient(disbursement.releaseRecipient)
+    }
+  }, [disbursement?.releaseRecipient])
+
+  const rawSourceOffices = disbursement?.sourceOffice as unknown
+  const sourceOfficesArray: string[] = Array.isArray(rawSourceOffices)
+    ? (rawSourceOffices as string[])
+    : typeof rawSourceOffices === "string" && rawSourceOffices.length > 0
+    ? [rawSourceOffices as string]
+    : []
+
+  const sourceOffices = sourceOfficesArray
+    .map((office) => office.trim())
+    .filter((office) => office.length > 0)
 
   const handleEdit = () => {
     // Navigate to edit page with the disbursement ID
@@ -585,6 +608,11 @@ export default function DisbursementDetailPage() {
       return
     }
 
+    if (treasuryAction === "MARK_RELEASED" && !treasuryReleaseRecipient.trim()) {
+      setTreasuryPasswordError("Receiver name is required")
+      return
+    }
+
     if (!treasuryAction) {
       setTreasuryPasswordError("No action selected")
       return
@@ -618,21 +646,25 @@ export default function DisbursementDetailPage() {
         },
         body: JSON.stringify({
           action: treasuryAction,
-          checkNumber: treasuryAction === "CHECK_ISSUANCE" ? checkNumber : undefined
+          checkNumber: treasuryAction === "CHECK_ISSUANCE" ? checkNumber : undefined,
+          releaseRecipient: treasuryAction === "MARK_RELEASED" ? treasuryReleaseRecipient.trim() : undefined
         }),
       })
 
-      if (response.ok) {
-        const updatedDisbursement = await response.json()
-        setDisbursement(updatedDisbursement)
-        setCheckNumber("") // Clear check number after successful issuance
-        setShowTreasuryDialog(false)
-        setTreasuryPassword("")
-        setTreasuryAction(null)
-      } else {
+      if (!response.ok) {
         const errorData = await response.json()
         setTreasuryPasswordError(errorData.error || "Failed to process Treasury action")
+        return
       }
+
+      const updatedDisbursement = await response.json()
+      setDisbursement(updatedDisbursement)
+      setShowTreasuryDialog(false)
+      setTreasuryPassword("")
+      setTreasuryAction(null)
+      setCheckNumber("") // Clear check number after successful issuance
+      setTreasuryReleaseRecipient("")
+      await fetchDisbursement()
     } catch (error) {
       console.error("Error processing Treasury action:", error)
       setTreasuryPasswordError("Failed to process Treasury action")
@@ -649,6 +681,11 @@ export default function DisbursementDetailPage() {
       return
     }
 
+    if (action === "MARK_RELEASED" && !treasuryReleaseRecipient.trim()) {
+      setError("Receiver name is required")
+      return
+    }
+
     setIsApproving(true)
     setError("")
 
@@ -660,18 +697,25 @@ export default function DisbursementDetailPage() {
         },
         body: JSON.stringify({
           action,
-          checkNumber: action === "CHECK_ISSUANCE" ? checkNumber : undefined
+          checkNumber: action === "CHECK_ISSUANCE" ? checkNumber : undefined,
+          releaseRecipient: action === "MARK_RELEASED" ? treasuryReleaseRecipient.trim() : undefined
         }),
       })
 
-      if (response.ok) {
-        const updatedDisbursement = await response.json()
-        setDisbursement(updatedDisbursement)
-        setCheckNumber("") // Clear check number after successful issuance
-      } else {
+      if (!response.ok) {
         const errorData = await response.json()
         setError(errorData.error || "Failed to process Treasury action")
+        return
       }
+
+      const updatedDisbursement = await response.json()
+      setDisbursement(updatedDisbursement)
+      setShowTreasuryDialog(false)
+      setTreasuryPassword("")
+      setTreasuryAction(null)
+      setCheckNumber("") // Clear check number after successful issuance
+      setTreasuryReleaseRecipient("")
+      await fetchDisbursement()
     } catch (error) {
       console.error("Error processing Treasury action:", error)
       setError("Failed to process Treasury action")
@@ -698,16 +742,18 @@ export default function DisbursementDetailPage() {
         }),
       })
 
-      if (response.ok) {
-        const result = await response.json()
-        setDisbursement(result.disbursement)
-        setShowRemarksDialog(false)
-        setRemarksText("")
-        setSelectedOffices([])
-      } else {
+      if (!response.ok) {
         const errorData = await response.json()
         setError(errorData.error || "Failed to submit remarks")
+        return
       }
+
+      setShowRemarksDialog(false)
+      setRemarksText("")
+      setSelectedOffices([])
+
+      // Refresh disbursement data to ensure UI reflects the latest remarks without manual reload
+      await fetchDisbursement()
     } catch (error) {
       console.error("Error submitting remarks:", error)
       setError("Failed to submit remarks")
@@ -1196,6 +1242,239 @@ export default function DisbursementDetailPage() {
       trail.userId === session.user.id
     )
 
+  const workflowActions: { key: string; node: ReactNode }[] = []
+
+  if (canSubmit) {
+    workflowActions.push({
+      key: "submit-for-review",
+      node: (
+        <Button
+          onClick={async () => {
+            setError("")
+            await handleSubmitForReview()
+          }}
+          disabled={isSubmitting}
+          className="w-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg disabled:bg-indigo-300 disabled:text-white disabled:shadow-none px-4 py-2 font-semibold transition-transform duration-150 hover:-translate-y-0.5"
+        >
+          <Send className="mr-2 h-4 w-4" />
+          {isSubmitting ? "Submitting..." : "Submit for Review"}
+        </Button>
+      )
+    })
+  }
+
+  if (canApproveNow) {
+    workflowActions.push({
+      key: "approve",
+      node: (
+        <Button
+          onClick={() => handleApproval("APPROVED")}
+          disabled={isApproving}
+          className="w-full bg-green-600 hover:bg-green-700"
+        >
+          <CheckCircle className="mr-2 h-4 w-4" />
+          {isApproving ? "Processing..." : 
+           effectiveApprovalLevel === 1 ? "Validate" :
+           effectiveApprovalLevel === 2 ? "Approve" : 
+           "Final Approve"}
+        </Button>
+      )
+    })
+
+    workflowActions.push({
+      key: "reject",
+      node: (
+        <Button
+          onClick={() => handleApproval("REJECTED")}
+          disabled={isApproving}
+          variant="destructive"
+          className="w-full"
+        >
+          <XCircle className="mr-2 h-4 w-4" />
+          Reject
+        </Button>
+      )
+    })
+  }
+
+  if (canSecretaryReview) {
+    workflowActions.push({
+      key: "secretary-review",
+      node: (
+        <Button
+          onClick={() => setShowReviewDialog(true)}
+          disabled={isApproving || secretaryHasReviewed}
+          className={`w-full ${
+            secretaryHasReviewed 
+              ? "bg-gray-400 hover:bg-gray-400 cursor-not-allowed" 
+              : "bg-indigo-600 hover:bg-indigo-700"
+          }`}
+        >
+          {secretaryHasReviewed ? (
+            <CheckCircle className="mr-2 h-4 w-4" />
+          ) : (
+            <Eye className="mr-2 h-4 w-4" />
+          )}
+          {isApproving ? "Processing..." : secretaryHasReviewed ? "Secretary Reviewed" : "Secretary Review"}
+        </Button>
+      )
+    })
+  }
+
+  if (canMayorReview) {
+    workflowActions.push({
+      key: "mayor-review",
+      node: (
+        <Button
+          onClick={() => setShowReviewDialog(true)}
+          disabled={isApproving || mayorHasReviewed}
+          className={`w-full ${
+            mayorHasReviewed 
+              ? "bg-gray-400 hover:bg-gray-400 cursor-not-allowed" 
+              : "bg-blue-600 hover:bg-blue-700"
+          }`}
+        >
+          {mayorHasReviewed ? (
+            <CheckCircle className="mr-2 h-4 w-4" />
+          ) : (
+            <Eye className="mr-2 h-4 w-4" />
+          )}
+          {isApproving ? "Processing..." : mayorHasReviewed ? "Reviewed" : "Review"}
+        </Button>
+      )
+    })
+  }
+
+  if (showBacReviewButton) {
+    workflowActions.push({
+      key: "bac-review",
+      node: (
+        <Button
+          onClick={() => setShowReviewDialog(true)}
+          disabled={isApproving || currentBacMemberHasReviewed || !mayorHasReviewedGso}
+          className={`w-full ${
+            currentBacMemberHasReviewed
+              ? "bg-gray-400 hover:bg-gray-400 cursor-not-allowed"
+              : !mayorHasReviewedGso
+              ? "bg-gray-300 hover:bg-gray-300 cursor-not-allowed"
+              : "bg-purple-600 hover:bg-purple-700"
+          }`}
+          title={
+            !mayorHasReviewedGso ? "Waiting for Mayor's review" : 
+            currentBacMemberHasReviewed ? "You have already reviewed this voucher" : ""
+          }
+        >
+          {currentBacMemberHasReviewed ? (
+            <CheckCircle className="mr-2 h-4 w-4" />
+          ) : !mayorHasReviewedGso ? (
+            <Clock className="mr-2 h-4 w-4" />
+          ) : (
+            <Eye className="mr-2 h-4 w-4" />
+          )}
+          {isApproving ? "Processing..." : 
+           currentBacMemberHasReviewed ? "You Reviewed" : 
+           !mayorHasReviewedGso ? "Awaiting Mayor Review" : 
+           "BAC Review"}
+        </Button>
+      )
+    })
+  }
+
+  if (showBudgetReviewButton) {
+    workflowActions.push({
+      key: "budget-review",
+      node: (
+        <Button
+          onClick={() => setShowReviewDialog(true)}
+          disabled={isApproving || budgetHasReviewed || budgetHasReviewedGso}
+          className={`w-full ${
+            budgetHasReviewed || budgetHasReviewedGso
+              ? "bg-gray-400 hover:bg-gray-400 cursor-not-allowed"
+              : "bg-orange-600 hover:bg-orange-700"
+          }`}
+        >
+          {budgetHasReviewed || budgetHasReviewedGso ? (
+            <CheckCircle className="mr-2 h-4 w-4" />
+          ) : (
+            <Eye className="mr-2 h-4 w-4" />
+          )}
+          {isApproving ? "Processing..." : 
+           budgetHasReviewed || budgetHasReviewedGso ? "Budget Reviewed" : 
+           "Budget Review"}
+        </Button>
+      )
+    })
+  }
+
+  if (showAccountingReviewButton) {
+    workflowActions.push({
+      key: "accounting-review",
+      node: (
+        <Button
+          onClick={() => setShowReviewDialog(true)}
+          disabled={isApproving || accountingHasReviewed}
+          className={`w-full ${
+            accountingHasReviewed
+              ? "bg-gray-400 hover:bg-gray-400 cursor-not-allowed"
+              : "bg-green-600 hover:bg-green-700"
+          }`}
+        >
+          {accountingHasReviewed ? (
+            <CheckCircle className="mr-2 h-4 w-4" />
+          ) : (
+            <Eye className="mr-2 h-4 w-4" />
+          )}
+          {isApproving ? "Processing..." : 
+           accountingHasReviewed ? "Accounting Reviewed" : 
+           "Accounting Review"}
+        </Button>
+      )
+    })
+  }
+
+  if (canEdit) {
+    workflowActions.push({
+      key: "edit",
+      node: (
+        <Button variant="outline" onClick={handleEdit} className="w-full">
+          <Edit className="mr-2 h-4 w-4" />
+          Edit
+        </Button>
+      )
+    })
+
+    workflowActions.push({
+      key: "delete",
+      node: (
+        <Button
+          variant="destructive"
+          onClick={() => setShowDeleteDialog(true)}
+          className="w-full"
+        >
+          <XCircle className="mr-2 h-4 w-4" />
+          Delete
+        </Button>
+      )
+    })
+  }
+
+  workflowActions.push({
+    key: "remarks",
+    node: (
+      <Button
+        variant="outline"
+        onClick={() => setShowRemarksDialog(true)}
+        className="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
+      >
+        <MessageSquare className="mr-2 h-4 w-4" />
+        Submit Remarks
+      </Button>
+    )
+  })
+
+  const showBacStatus = Boolean(disbursement?.createdBy?.role === "GSO" && Array.isArray(disbursement?.bacReviews))
+  const showWorkflowCard = workflowActions.length > 0 || showBacStatus
+
   return (
     <MainLayout>
       <div className="p-6 max-w-6xl mx-auto space-y-6">
@@ -1214,7 +1493,7 @@ export default function DisbursementDetailPage() {
               <p className="text-gray-600">Disbursement Voucher #{disbursement?.id?.slice(-8)}</p>
             </div>
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <Badge className={getStatusColor(disbursement?.status)}>
               {disbursement?.status}
             </Badge>
@@ -1222,7 +1501,7 @@ export default function DisbursementDetailPage() {
             {(() => {
               const currentReviewer = getCurrentReviewer(disbursement)
               return currentReviewer ? (
-                <div className="flex items-center space-x-2 px-3 py-1 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 border border-blue-200 rounded-lg">
                   <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
                   <span className="text-sm font-medium text-blue-800">Current Reviewer:</span>
                   <span className="text-sm text-blue-700">{currentReviewer.displayName}</span>
@@ -1230,242 +1509,159 @@ export default function DisbursementDetailPage() {
                 </div>
               ) : null
             })()}
-            {canSubmit && (
-              <Button 
-                onClick={async () => {
-                  setError("")
-                  await handleSubmitForReview()
-                }}
-                disabled={isSubmitting}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg disabled:bg-indigo-300 disabled:text-white disabled:shadow-none px-4 py-2 font-semibold transition-transform duration-150 hover:-translate-y-0.5"
-              >
-                <Send className="mr-2 h-4 w-4" />
-                {isSubmitting ? "Submitting..." : "Submit for Review"}
-              </Button>
-            )}
-            {canApproveNow && (
-              <>
-                <Button 
-                  onClick={() => handleApproval("APPROVED")}
-                  disabled={isApproving}
-                  className="bg-green-600 hover:bg-green-700"
-                >
-                  <CheckCircle className="mr-2 h-4 w-4" />
-                  {isApproving ? "Processing..." : 
-                   effectiveApprovalLevel === 1 ? "Validate" :
-                   effectiveApprovalLevel === 2 ? "Approve" : 
-                   "Final Approve"}
-                </Button>
-                <Button 
-                  onClick={() => handleApproval("REJECTED")}
-                  disabled={isApproving}
-                  variant="destructive"
-                >
-                  <XCircle className="mr-2 h-4 w-4" />
-                  Reject
-                </Button>
-              </>
-            )}
-            {canSecretaryReview && (
-              <Button 
-                onClick={() => setShowReviewDialog(true)}
-                disabled={isApproving || secretaryHasReviewed}
-                className={secretaryHasReviewed 
-                  ? "bg-gray-400 hover:bg-gray-400 cursor-not-allowed" 
-                  : "bg-indigo-600 hover:bg-indigo-700"
-                }
-              >
-                {secretaryHasReviewed ? (
-                  <CheckCircle className="mr-2 h-4 w-4" />
-                ) : (
-                  <Eye className="mr-2 h-4 w-4" />
-                )}
-                {isApproving ? "Processing..." : secretaryHasReviewed ? "Secretary Reviewed" : "Secretary Review"}
-              </Button>
-            )}
-            {canMayorReview && (
-              <Button 
-                onClick={() => setShowReviewDialog(true)}
-                disabled={isApproving || mayorHasReviewed}
-                className={mayorHasReviewed 
-                  ? "bg-gray-400 hover:bg-gray-400 cursor-not-allowed" 
-                  : "bg-blue-600 hover:bg-blue-700"
-                }
-              >
-                {mayorHasReviewed ? (
-                  <CheckCircle className="mr-2 h-4 w-4" />
-                ) : (
-                  <Eye className="mr-2 h-4 w-4" />
-                )}
-                {isApproving ? "Processing..." : mayorHasReviewed ? "Reviewed" : "Review"}
-              </Button>
-            )}
-            {showBacReviewButton && (
-              <Button 
-                onClick={() => setShowReviewDialog(true)}
-                disabled={isApproving || currentBacMemberHasReviewed || !mayorHasReviewedGso}
-                className={currentBacMemberHasReviewed 
-                  ? "bg-gray-400 hover:bg-gray-400 cursor-not-allowed" 
-                  : !mayorHasReviewedGso
-                  ? "bg-gray-300 hover:bg-gray-300 cursor-not-allowed"
-                  : "bg-purple-600 hover:bg-purple-700"
-                }
-                title={!mayorHasReviewedGso ? "Waiting for Mayor's review" : 
-                       currentBacMemberHasReviewed ? "You have already reviewed this voucher" : ""}
-              >
-                {currentBacMemberHasReviewed ? (
-                  <CheckCircle className="mr-2 h-4 w-4" />
-                ) : !mayorHasReviewedGso ? (
-                  <Clock className="mr-2 h-4 w-4" />
-                ) : (
-                  <Eye className="mr-2 h-4 w-4" />
-                )}
-                {isApproving ? "Processing..." : 
-                 currentBacMemberHasReviewed ? "You Reviewed" : 
-                 !mayorHasReviewedGso ? "Awaiting Mayor Review" : 
-                 "BAC Review"}
-              </Button>
-            )}
-            
-            {/* BAC Review Status Display */}
-            {disbursement?.createdBy.role === "GSO" && disbursement?.bacReviews && (
-              <div className="mt-2 p-3 bg-purple-50 border border-purple-200 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Eye className="h-4 w-4 text-purple-600" />
-                    <span className="text-sm font-medium text-purple-800">
-                      BAC Reviews: {disbursement?.bacReviews?.length || 0}/5 members
-                    </span>
-                  </div>
-                  <div className="text-sm text-purple-600">
-                    {(disbursement?.bacReviews?.length || 0) >= 3 ? (
-                      <span className="text-green-600 font-medium">✓ Complete (3+ reviews)</span>
-                    ) : (
-                      <span>Need {3 - (disbursement?.bacReviews?.length || 0)} more reviews</span>
-                    )}
-                  </div>
-                </div>
-                {(disbursement?.bacReviews?.length || 0) > 0 && (
-                  <div className="mt-2 text-xs text-purple-600">
-                    Reviewed by: {disbursement?.bacReviews?.map((review) => review.reviewer.name).join(", ") || "None"}
-                  </div>
-                )}
-              </div>
-            )}
-            {showBudgetReviewButton && (
-              <Button 
-                onClick={() => setShowReviewDialog(true)}
-                disabled={isApproving || budgetHasReviewed || budgetHasReviewedGso}
-                className={budgetHasReviewed || budgetHasReviewedGso 
-                  ? "bg-gray-400 hover:bg-gray-400 cursor-not-allowed" 
-                  : "bg-orange-600 hover:bg-orange-700"
-                }
-              >
-                {budgetHasReviewed || budgetHasReviewedGso ? (
-                  <CheckCircle className="mr-2 h-4 w-4" />
-                ) : (
-                  <Eye className="mr-2 h-4 w-4" />
-                )}
-                {isApproving ? "Processing..." : 
-                 budgetHasReviewed || budgetHasReviewedGso ? "Budget Reviewed" : 
-                 "Budget Review"}
-              </Button>
-            )}
-            {showAccountingReviewButton && (
-              <Button 
-                onClick={() => setShowReviewDialog(true)}
-                disabled={isApproving || accountingHasReviewed}
-                className={accountingHasReviewed 
-                  ? "bg-gray-400 hover:bg-gray-400 cursor-not-allowed" 
-                  : "bg-green-600 hover:bg-green-700"
-                }
-              >
-                {accountingHasReviewed ? (
-                  <CheckCircle className="mr-2 h-4 w-4" />
-                ) : (
-                  <Eye className="mr-2 h-4 w-4" />
-                )}
-                {isApproving ? "Processing..." : 
-                 accountingHasReviewed ? "Accounting Reviewed" : 
-                 "Accounting Review"}
-              </Button>
-            )}
-            {showTreasuryActionButton && (
-              <div className="space-y-2">
-                {canIssueCheck && (
-                  <div className="flex items-center space-x-2">
-                    <Input
-                      placeholder="Enter check number"
-                      value={checkNumber}
-                      onChange={(e) => setCheckNumber(e.target.value)}
-                      className="w-48"
-                    />
-                    <Button 
-                      onClick={() => {
-                        if (!checkNumber.trim()) {
-                          setError("Check number is required")
-                          return
-                        }
-                        setTreasuryAction("CHECK_ISSUANCE")
-                        setShowTreasuryDialog(true)
-                      }}
-                      disabled={isApproving || !checkNumber.trim()}
-                      className="bg-blue-600 hover:bg-blue-700"
-                    >
-                      {isApproving ? "Processing..." : "Check Number Issuance"}
-                    </Button>
-                  </div>
-                )}
-                
-                {canMarkReleased && (
-                  <Button 
-                    onClick={() => {
-                      setTreasuryAction("MARK_RELEASED")
-                      setShowTreasuryDialog(true)
-                    }}
-                    disabled={isApproving}
-                    className="bg-green-600 hover:bg-green-700"
-                  >
-                    {isApproving ? "Processing..." : "Available for Release"}
-                  </Button>
-                )}
-                
-                {hasMarkReleased && (
-                  <Button 
-                    disabled
-                    className="bg-gray-400 hover:bg-gray-400 cursor-not-allowed"
-                  >
-                    <CheckCircle className="mr-2 h-4 w-4" />
-                    Released
-                  </Button>
-                )}
-              </div>
-            )}
-            {canEdit && (
-              <Button variant="outline" onClick={handleEdit}>
-                <Edit className="mr-2 h-4 w-4" />
-                Edit
-              </Button>
-            )}
-            {canEdit && (
-              <Button 
-                variant="destructive" 
-                onClick={() => setShowDeleteDialog(true)}
-              >
-                <XCircle className="mr-2 h-4 w-4" />
-                Delete
-              </Button>
-            )}
-            <Button 
-              variant="outline"
-              onClick={() => setShowRemarksDialog(true)}
-              className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
-            >
-              <MessageSquare className="mr-2 h-4 w-4" />
-              Submit Remarks
-            </Button>
           </div>
         </div>
+
+        {(showWorkflowCard || showTreasuryActionButton) && (
+          <div className={`grid gap-4 ${showTreasuryActionButton ? "lg:grid-cols-3" : ""}`}>
+            {showWorkflowCard && (
+              <Card
+                className={`border border-slate-200 shadow-sm ${showTreasuryActionButton ? "lg:col-span-2" : "lg:col-span-3"}`}
+              >
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-800">
+                    <FileSignature className="h-5 w-5 text-indigo-600" />
+                    Workflow Actions
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {workflowActions.length > 0 && (
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                      {workflowActions.map(({ key, node }) => (
+                        <div key={key} className="flex">{node}</div>
+                      ))}
+                    </div>
+                  )}
+
+                  {showBacStatus && (
+                    <div className="rounded-xl border border-purple-200 bg-purple-50 p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <Eye className="h-4 w-4 text-purple-600" />
+                          <span className="text-sm font-medium text-purple-800">
+                            BAC Reviews: {disbursement?.bacReviews?.length || 0}/5 members
+                          </span>
+                        </div>
+                        <div className="text-sm text-purple-600">
+                          {(disbursement?.bacReviews?.length || 0) >= 3 ? (
+                            <span className="text-green-600 font-medium">✓ Complete (3+ reviews)</span>
+                          ) : (
+                            <span>Need {Math.max(3 - (disbursement?.bacReviews?.length || 0), 0)} more reviews</span>
+                          )}
+                        </div>
+                      </div>
+                      {(disbursement?.bacReviews?.length || 0) > 0 && (
+                        <div className="mt-2 text-xs text-purple-600">
+                          Reviewed by: {disbursement?.bacReviews?.map((review) => review.reviewer.name).join(", ") || "None"}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {showTreasuryActionButton && (
+              <Card className="border border-indigo-100 shadow-sm">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base font-semibold flex items-center gap-2 text-indigo-700">
+                    <Wallet className="h-5 w-5" />
+                    Treasury Actions
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-5">
+                  {canIssueCheck && (
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">Check Details</label>
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                        <Input
+                          placeholder="Enter check number"
+                          value={checkNumber}
+                          onChange={(e) => setCheckNumber(e.target.value)}
+                          className="sm:flex-1 border-gray-200 shadow-sm focus:border-indigo-400 focus:ring-indigo-400"
+                        />
+                        <Button
+                          onClick={() => {
+                            if (!checkNumber.trim()) {
+                              setError("Check number is required")
+                              return
+                            }
+                            setTreasuryAction("CHECK_ISSUANCE")
+                            setShowTreasuryDialog(true)
+                          }}
+                          disabled={isApproving || !checkNumber.trim()}
+                          className="bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 shadow-md"
+                        >
+                          {isApproving ? "Processing..." : "Issue Check"}
+                        </Button>
+                      </div>
+                      <p className="text-xs text-gray-500">
+                        Verify the check number before issuing to avoid discrepancies.
+                      </p>
+                    </div>
+                  )}
+
+                  {canMarkReleased && (
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">Receiver Name</label>
+                      <Input
+                        placeholder="Enter the name of the person receiving the funds"
+                        value={treasuryReleaseRecipient}
+                        onChange={(e) => {
+                          setTreasuryReleaseRecipient(e.target.value)
+                          if (error) setError("")
+                        }}
+                        disabled={isApproving}
+                        className="border-gray-200 shadow-sm focus:border-emerald-400 focus:ring-emerald-400"
+                      />
+                      <p className="text-xs text-gray-500">
+                        This will be recorded in the release audit trail.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    {canMarkReleased && (
+                      <Button
+                        onClick={() => {
+                          if (!treasuryReleaseRecipient.trim()) {
+                            setError("Receiver name is required")
+                            return
+                          }
+                          setTreasuryAction("MARK_RELEASED")
+                          setShowTreasuryDialog(true)
+                        }}
+                        disabled={isApproving || !treasuryReleaseRecipient.trim()}
+                        className="h-12 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-md disabled:from-emerald-300 disabled:to-emerald-300"
+                      >
+                        {isApproving ? "Processing..." : "Mark as Released"}
+                      </Button>
+                    )}
+
+                    {hasMarkReleased && (
+                      <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-green-700 space-y-1">
+                        <div className="flex items-center gap-2 font-semibold">
+                          <CheckCircle className="h-5 w-5" />
+                          Voucher Released
+                        </div>
+                        {disbursement.releaseRecipient && (
+                          <p className="text-sm text-green-800">
+                            Received by: <span className="font-medium">{disbursement.releaseRecipient}</span>
+                          </p>
+                        )}
+                        {disbursement.releaseDate && (
+                          <p className="text-xs text-green-700">
+                            Released on {formatDateTime(disbursement.releaseDate)}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
 
         {error && (
           <Alert variant="destructive">
@@ -1515,6 +1711,23 @@ export default function DisbursementDetailPage() {
                     {formatCurrency(disbursement.amount)}
                   </p>
                 </div>
+                {disbursement.checkNumber && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Check Number</label>
+                    <p className="text-sm text-gray-900">{disbursement.checkNumber}</p>
+                  </div>
+                )}
+                {disbursement.releaseRecipient && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Released To</label>
+                    <p className="text-sm text-gray-900">{disbursement.releaseRecipient}</p>
+                    {disbursement.releaseDate && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Released on {formatDateTime(disbursement.releaseDate)}
+                      </p>
+                    )}
+                  </div>
+                )}
                 <div>
                   <label className="text-sm font-medium text-gray-600">Particulars</label>
                   <p className="text-sm text-gray-900">{disbursement.particulars}</p>
@@ -1531,11 +1744,11 @@ export default function DisbursementDetailPage() {
                     </div>
                   </div>
                 )}
-                {disbursement.sourceOffice.length > 0 && (
+                {sourceOffices.length > 0 && (
                   <div>
-                    <label className="text-sm font-medium text-gray-600">Source Office</label>
+                    <label className="text-sm font-medium text-gray-600">Source Offices</label>
                     <div className="flex flex-wrap gap-2 mt-1">
-                      {disbursement.sourceOffice.map((office, index) => (
+                      {sourceOffices.map((office, index) => (
                         <span key={index} className="bg-green-100 text-green-800 px-2 py-1 rounded-md text-sm">
                           {office}
                         </span>
@@ -1692,7 +1905,7 @@ export default function DisbursementDetailPage() {
               <CardContent>
                 <div className="space-y-4">
                   {disbursement.auditTrails.slice(0, 10).map((trail) => {
-                    const getActionDescription = (action: string, trail: { newValues?: { checkNumber?: string; releaseDate?: string; treasuryActionComments?: string } }) => {
+                    const getActionDescription = (action: string, trail: { newValues?: { checkNumber?: string; releaseDate?: string; releaseRecipient?: string; treasuryActionComments?: string } }) => {
                       switch (action.toUpperCase()) {
                         case "CREATE": return "created the disbursement"
                         case "SUBMIT": return "submitted for review"
@@ -1709,7 +1922,10 @@ export default function DisbursementDetailPage() {
                         case "CHECK_ISSUANCE": 
                           const checkNumber = trail.newValues?.checkNumber
                           return checkNumber ? `issued check #${checkNumber}` : "issued check"
-                        case "MARK_RELEASED": return "released the disbursement"
+                        case "MARK_RELEASED":
+                          return trail.newValues?.releaseRecipient
+                            ? `released the disbursement to ${trail.newValues.releaseRecipient}`
+                            : "released the disbursement"
                         case "SUBMIT_REMARKS": return "submitted remarks to source offices"
                         default: return `${action.toLowerCase()}d the disbursement`
                       }
@@ -1786,11 +2002,19 @@ export default function DisbursementDetailPage() {
 
                           {/* Show release details for MARK_RELEASED action */}
                           {trail.action === "MARK_RELEASED" && trail.newValues && (
-                            <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-md">
-                              <div className="mb-2">
+                            <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-md space-y-2">
+                              <div>
                                 <span className="text-xs font-medium text-green-800">Released Date:</span>
-                                <p className="text-sm text-green-900 mt-1">{formatDateTime(trail.newValues.releaseDate)}</p>
+                                <p className="text-sm text-green-900 mt-1">
+                                  {trail.newValues.releaseDate ? formatDateTime(trail.newValues.releaseDate) : "Not recorded"}
+                                </p>
                               </div>
+                              {trail.newValues.releaseRecipient && (
+                                <div>
+                                  <span className="text-xs font-medium text-green-800">Received By:</span>
+                                  <p className="text-sm text-green-900 mt-1">{trail.newValues.releaseRecipient}</p>
+                                </div>
+                              )}
                               {trail.newValues.treasuryActionComments && (
                                 <div>
                                   <span className="text-xs font-medium text-green-800">Comments:</span>
@@ -2133,6 +2357,12 @@ export default function DisbursementDetailPage() {
                     <strong>Check Number:</strong> {checkNumber}
                   </>
                 )}
+                {treasuryAction === "MARK_RELEASED" && (
+                  <>
+                    <br />
+                    <strong>Receiver:</strong> {treasuryReleaseRecipient || "—"}
+                  </>
+                )}
               </DialogDescription>
             </DialogHeader>
             
@@ -2172,7 +2402,11 @@ export default function DisbursementDetailPage() {
               </Button>
               <Button
                 onClick={handleTreasuryPasswordVerification}
-                disabled={isApproving || !treasuryPassword.trim()}
+                disabled={
+                  isApproving ||
+                  !treasuryPassword.trim() ||
+                  (treasuryAction === "MARK_RELEASED" && !treasuryReleaseRecipient.trim())
+                }
                 className={treasuryAction === "CHECK_ISSUANCE" ? "bg-blue-600 hover:bg-blue-700" : "bg-green-600 hover:bg-green-700"}
               >
                 {isApproving ? (

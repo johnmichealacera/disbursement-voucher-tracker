@@ -9,6 +9,7 @@ import { VoucherStatus } from "@prisma/client"
 const treasuryReviewSchema = z.object({
   action: z.enum(["CHECK_ISSUANCE", "MARK_RELEASED"]),
   checkNumber: z.string().optional(),
+  releaseRecipient: z.string().optional(),
   remarks: z.string().optional()
 })
 
@@ -112,6 +113,12 @@ export async function POST(
     }
 
     if (validatedData.action === "MARK_RELEASED") {
+      if (!validatedData.releaseRecipient || validatedData.releaseRecipient.trim() === "") {
+        return NextResponse.json({
+          error: "Receiver name is required to mark the voucher as released"
+        }, { status: 400 })
+      }
+
       // For marking as released, check if it's ready for release
       if (disbursement.status !== "APPROVED" && !disbursement.checkNumber) {
         return NextResponse.json({ 
@@ -125,6 +132,7 @@ export async function POST(
       checkNumber?: string
       status?: VoucherStatus
       releaseDate?: Date
+      releaseRecipient?: string | null
     } = {}
     let auditAction = ""
     let auditMessage = ""
@@ -139,7 +147,8 @@ export async function POST(
     } else if (validatedData.action === "MARK_RELEASED") {
       updateData = {
         status: "RELEASED",
-        releaseDate: new Date()
+        releaseDate: new Date(),
+        releaseRecipient: validatedData.releaseRecipient?.trim() ?? null
       }
       auditAction = "MARK_RELEASED"
       auditMessage = "Voucher marked as released"
@@ -162,6 +171,7 @@ export async function POST(
           status: updateData.status,
           checkNumber: updateData.checkNumber,
           releaseDate: updateData.releaseDate,
+          releaseRecipient: updateData.releaseRecipient,
           treasuryActionBy: session.user.name,
           treasuryActionComments: validatedData.remarks,
           actionMessage: auditMessage
@@ -181,7 +191,8 @@ export async function POST(
       performedByRole: "TREASURY",
       disbursementCreatedBy: disbursement.createdBy.role,
       remarks: validatedData.remarks,
-      checkNumber: updateData.checkNumber
+      checkNumber: updateData.checkNumber,
+      releaseRecipient: updateData.releaseRecipient ?? undefined
     })
 
     // Get updated disbursement with all relations

@@ -41,7 +41,7 @@ export async function POST(
     // Check if user can submit remarks (anyone with access to the voucher can submit remarks)
     const canSubmitRemarks = 
       disbursement.createdById === session.user.id ||
-      ["ADMIN", "ACCOUNTING", "BUDGET", "TREASURY", "MAYOR", "DEPARTMENT_HEAD", "FINANCE_HEAD", "BAC"].includes(session.user.role)
+      ["ADMIN", "ACCOUNTING", "BUDGET", "TREASURY", "MAYOR", "DEPARTMENT_HEAD", "FINANCE_HEAD", "BAC", "SECRETARY"].includes(session.user.role)
 
     if (!canSubmitRemarks) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 })

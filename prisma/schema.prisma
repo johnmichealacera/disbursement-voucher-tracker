@@ -97,6 +97,7 @@ model DisbursementVoucher {
   paymentMethod PaymentMethod?
   checkNumber String?
   releaseDate DateTime?
+  releaseRecipient String?
   
   createdById  String
   assignedToId String?
