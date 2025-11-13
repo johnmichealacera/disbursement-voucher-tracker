@@ -41,7 +41,9 @@ A comprehensive, transparent, and efficient disbursement tracking system designe
 - **Item-based Requests**: Detailed line items with automatic calculations
 - **Document Attachments**: Support for supporting documents
 - **Approval Workflow**: Structured multi-level approval process with role-based buttons
-- **Status Management**: Clear status progression (Draft → Pending → Validated → Approved → Released)
+- **Directory Management**: Centralized Payee, Tag, and Item directories with admin CRUD controls
+- **Searchable Dropdowns**: Inline search and quick-add dialogs when building disbursement vouchers
+- **Status Management**: Clear status progression (Draft → Pending → Validated → Approved → Released / Cancelled)
 - **Real-time Notifications**: Smart notification system with role-based alerts
 - **Enhanced Audit Trail**: Complete history with detailed timestamps and action descriptions
 - **User Management**: Complete admin interface for user administration
@@ -212,6 +214,12 @@ prisma/
 - Role-based button visibility ensures proper workflow progression
 - Comprehensive audit trail tracks all actions
 
+### 5. Cancellation Workflow
+- Authorized roles (creator, Admin, Mayor, Budget, Accounting, Treasury, Department Head, Finance Head) can cancel vouchers in Pending/Validated/Approved states
+- Cancellation requires a reason and immediately halts the workflow
+- All relevant departments receive notifications and the activity log records who cancelled and why
+- Voucher status updates to `CANCELLED`, which is visible across dashboards, status badges, and reports
+
 ## 🔐 Security Features
 
 - **Role-based Access Control**: Granular permissions per user role
@@ -331,6 +339,7 @@ The system features a comprehensive notification system that keeps users informe
 
 ### Notifications
 - `GET /api/notifications` - Get role-based notifications for current user
+- `POST /api/disbursements/[id]/cancel` - Cancel a disbursement with reason (authorized roles only)
 
 ## 🤝 Contributing
 
@@ -393,11 +402,17 @@ For technical support or questions:
 - **Visual Workflow Progress**: Clear indication of where each voucher stands
 - **Responsive Design**: Optimized for all device types
 - **Intuitive Navigation**: Easy access to relevant functions for each role
+- **Searchable Directory Inputs**: Payee, Tag, and Item selections now support inline search and quick creation
 
 ## 🐛 Recent Bug Fixes (v3.1)
 
 ### **🔧 Critical Fixes**
 - **Fixed Prisma Validation Error**: Resolved conflicting `include`/`select` clauses in notifications API causing 500 errors for Mayor role
+
+### **✨ New in v3.2**
+- **Voucher Cancellation**: Authorized users can cancel in-flight vouchers with reason capture and audit logging
+- **Directory Management**: Dedicated admin tools (and APIs) to manage payees, tags, and item templates with instant front-end search
+- **Status Reporting**: Dashboards, filters, notifications, and progress indicators now include the `CANCELLED` state for complete visibility
 - **Corrected Property References**: Fixed notification messages using correct `payee` property instead of non-existent `title` property
 - **TypeScript Form Schema Fix**: Resolved type mismatch in create voucher form for `tags` and `sourceOffice` array fields
 - **Code Quality Improvements**: Cleaned up unused imports and parameters to eliminate linting warnings
