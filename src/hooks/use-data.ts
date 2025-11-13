@@ -42,6 +42,7 @@ interface DashboardStats {
   pendingVouchers: number
   approvedVouchers: number
   rejectedVouchers: number
+  cancelledVouchers: number
   totalAmount: number
   monthlyAmount: number
 }
@@ -86,6 +87,7 @@ const fetchDashboardStats = async (): Promise<DashboardStats> => {
   const pending = disbursements.filter((v: Disbursement) => v.status === "PENDING").length
   const approved = disbursements.filter((v: Disbursement) => v.status === "APPROVED" || v.status === "RELEASED").length
   const rejected = disbursements.filter((v: Disbursement) => v.status === "REJECTED").length
+  const cancelled = disbursements.filter((v: Disbursement) => v.status === "CANCELLED").length
   const totalAmount = disbursements.reduce((sum: number, v: Disbursement) => sum + parseFloat(v.amount.toString()), 0)
   
   const currentMonth = new Date().getMonth()
@@ -98,6 +100,7 @@ const fetchDashboardStats = async (): Promise<DashboardStats> => {
     pendingVouchers: pending,
     approvedVouchers: approved,
     rejectedVouchers: rejected,
+    cancelledVouchers: cancelled,
     totalAmount,
     monthlyAmount
   }

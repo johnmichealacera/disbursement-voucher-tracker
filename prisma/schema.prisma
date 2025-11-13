@@ -32,6 +32,7 @@ enum VoucherStatus {
   APPROVED
   RELEASED
   REJECTED
+  CANCELLED
 }
 
 enum ApprovalStatus {

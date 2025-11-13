@@ -57,6 +57,8 @@ export function getStatusColor(status: string | undefined | null): string {
       return 'bg-emerald-100 text-emerald-800'
     case 'rejected':
       return 'bg-red-100 text-red-800'
+    case 'cancelled':
+      return 'bg-slate-200 text-slate-900 border border-slate-300'
     default:
       return 'bg-gray-100 text-gray-800'
   }
@@ -101,7 +103,7 @@ export function getCurrentReviewer(disbursement: any): { role: string; displayNa
   const { createdBy, approvals, bacReviews, status, auditTrails } = disbursement
 
   // If voucher is rejected or released, no current reviewer
-  if (status === 'REJECTED' || status === 'RELEASED') {
+  if (status === 'REJECTED' || status === 'RELEASED' || status === 'CANCELLED') {
     return null
   }
 

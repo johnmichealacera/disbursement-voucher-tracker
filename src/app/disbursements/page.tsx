@@ -147,7 +147,8 @@ function DisbursementsContent() {
     { value: "VALIDATED", label: "Validated" },
     { value: "APPROVED", label: "Approved" },
     { value: "RELEASED", label: "Released" },
-    { value: "REJECTED", label: "Rejected" }
+    { value: "REJECTED", label: "Rejected" },
+    { value: "CANCELLED", label: "Cancelled" }
   ]
 
   return (

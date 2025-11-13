@@ -318,7 +318,7 @@ export async function GET() {
           where: {
             createdById: session.user.id,
             status: {
-              in: ["VALIDATED", "APPROVED", "RELEASED", "REJECTED"]
+              in: ["VALIDATED", "APPROVED", "RELEASED", "REJECTED", "CANCELLED"]
             }
           },
           select: {
@@ -359,6 +359,11 @@ export async function GET() {
             case "REJECTED":
               title = "Voucher Rejected"
               message = `Your request "${voucher.payee}" has been rejected`
+              priority = "high"
+              break
+            case "CANCELLED":
+              title = "Voucher Cancelled"
+              message = `Your request "${voucher.payee}" has been cancelled`
               priority = "high"
               break
           }

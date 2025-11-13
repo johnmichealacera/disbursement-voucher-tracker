@@ -11,7 +11,7 @@ const updateDisbursementSchema = z.object({
   particulars: z.string().min(1).optional(),
   tags: z.array(z.string()).optional(),
   sourceOffice: z.array(z.string()).optional(),
-  status: z.enum(["DRAFT", "PENDING", "VALIDATED", "APPROVED", "RELEASED", "REJECTED"]).optional(),
+  status: z.enum(["DRAFT", "PENDING", "VALIDATED", "APPROVED", "RELEASED", "REJECTED", "CANCELLED"]).optional(),
   remarks: z.string().optional(),
   assignedToId: z.string().optional(),
   items: z.array(z.object({

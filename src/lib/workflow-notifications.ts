@@ -154,6 +154,10 @@ function createNotificationMessage(data: NotificationData): string {
       
     case "MARK_RELEASED":
       return `Disbursement voucher "${payee}" (${formattedAmount}) has been released to ${data.releaseRecipient ?? "the recipient"} by Treasury Office (${performedBy})`
+    case "CANCELLED": {
+      const reasonText = remarks ? ` Reason: ${remarks}.` : ""
+      return `Disbursement voucher "${payee}" (${formattedAmount}) has been cancelled by ${performedBy} (${performedByRole.replace("_", " ")}).${reasonText}`
+    }
       
     default:
       return `Disbursement voucher "${payee}" (${formattedAmount}) status updated by ${performedBy} (${performedByRole.replace("_", " ")})`
@@ -163,6 +167,7 @@ function createNotificationMessage(data: NotificationData): string {
 function getNotificationPriority(action: string): "high" | "medium" | "low" {
   switch (action) {
     case "REJECT":
+    case "CANCELLED":
     case "CHECK_ISSUANCE":
     case "MARK_RELEASED":
       return "high"

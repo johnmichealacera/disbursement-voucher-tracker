@@ -15,7 +15,8 @@ import {
   XCircle,
   Banknote,
   TrendingUp,
-  Plus
+  Plus,
+  Ban
 } from "lucide-react"
 import { useDashboardStats, useRecentDisbursements } from "@/hooks/use-data"
 import { DashboardStatsSkeleton, AmountCardsSkeleton, DisbursementListSkeleton } from "@/components/ui/skeletons"
@@ -25,6 +26,7 @@ interface DashboardStats {
   pendingVouchers: number
   approvedVouchers: number
   rejectedVouchers: number
+  cancelledVouchers: number
   totalAmount: number
   monthlyAmount: number
 }
@@ -100,6 +102,13 @@ export default function DashboardPage() {
       icon: XCircle,
       color: "text-red-600",
       bgColor: "bg-red-50"
+    },
+    {
+      title: "Cancelled",
+      value: stats?.cancelledVouchers || 0,
+      icon: Ban,
+      color: "text-slate-600",
+      bgColor: "bg-slate-100"
     }
   ]
 

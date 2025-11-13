@@ -53,8 +53,8 @@ import {
   Eye,
   MessageSquare,
   Wallet,
-  Plus,
-  X
+  X,
+  Ban
 } from "lucide-react"
 import { BacReview } from "@prisma/client"
 
@@ -157,6 +157,10 @@ export default function DisbursementDetailPage() {
   const [treasuryPasswordError, setTreasuryPasswordError] = useState("")
   const [showTreasuryDialog, setShowTreasuryDialog] = useState(false)
   const [treasuryAction, setTreasuryAction] = useState<"CHECK_ISSUANCE" | "MARK_RELEASED" | null>(null)
+  const [showCancelDialog, setShowCancelDialog] = useState(false)
+  const [cancelReason, setCancelReason] = useState("")
+  const [cancelError, setCancelError] = useState("")
+  const [isCancelling, setIsCancelling] = useState(false)
 
   useEffect(() => {
     if (disbursement?.releaseRecipient) {
@@ -174,6 +178,24 @@ export default function DisbursementDetailPage() {
   const sourceOffices = sourceOfficesArray
     .map((office) => office.trim())
     .filter((office) => office.length > 0)
+
+  const cancellationDetails = useMemo(() => {
+    if (!disbursement?.auditTrails) {
+      return null
+    }
+
+    const trail = disbursement.auditTrails.find((entry) => entry.action === "CANCELLED")
+    if (!trail) {
+      return null
+    }
+
+    return {
+      reason: trail.newValues?.cancellationReason as string | undefined,
+      by: trail.user?.name,
+      role: trail.user?.role,
+      timestamp: trail.timestamp
+    }
+  }, [disbursement?.auditTrails])
 
   const handleEdit = () => {
     // Navigate to edit page with the disbursement ID
@@ -222,6 +244,54 @@ export default function DisbursementDetailPage() {
       setError("An error occurred while deleting the disbursement")
     } finally {
       setIsDeleting(false)
+    }
+  }
+
+  const handleCancelDisbursement = async () => {
+    if (!cancelReason.trim()) {
+      setCancelError("Please provide a reason for cancelling this voucher.")
+      return
+    }
+
+    setIsCancelling(true)
+    setCancelError("")
+
+    try {
+      const response = await fetch(`/api/disbursements/${id}/cancel`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          reason: cancelReason.trim()
+        })
+      })
+
+      if (!response.ok) {
+        let message = "Failed to cancel disbursement"
+        try {
+          const errorData = await response.json()
+          if (errorData?.error) {
+            message = errorData.error
+          } else if (Array.isArray(errorData?.details) && errorData.details.length > 0) {
+            message = errorData.details.map((detail: { message?: string }) => detail.message).filter(Boolean).join(", ")
+          }
+        } catch {}
+        setCancelError(message)
+        return
+      }
+
+      const updatedDisbursement = await response.json()
+      setDisbursement(updatedDisbursement)
+      setShowCancelDialog(false)
+      setCancelReason("")
+      setCancelError("")
+      await fetchDisbursement()
+    } catch (error) {
+      console.error("Error cancelling disbursement:", error)
+      setCancelError("An error occurred while cancelling the disbursement. Please try again.")
+    } finally {
+      setIsCancelling(false)
     }
   }
 
@@ -888,6 +958,10 @@ export default function DisbursementDetailPage() {
   const canEdit = disbursement.status === "DRAFT" && 
     (disbursement.createdBy.id === session.user.id || ["ADMIN", "GSO", "HR"].includes(session.user.role))
 
+  const cancellableStatuses = ["PENDING", "VALIDATED", "APPROVED"]
+  const canCancel = cancellableStatuses.includes(disbursement.status) &&
+    (disbursement.createdBy.id === session.user.id || ["ADMIN", "ACCOUNTING", "BUDGET", "TREASURY", "MAYOR", "DEPARTMENT_HEAD", "FINANCE_HEAD"].includes(session.user.role))
+
   // Determine approval permissions based on role and current status
   const getApprovalLevel = (role: string): number | null => {
     switch (role) {
@@ -1177,6 +1251,7 @@ export default function DisbursementDetailPage() {
 
   const canIssueCheck = session.user.role === "TREASURY" && 
     disbursement && 
+    disbursement.status !== "CANCELLED" &&
     disbursement.approvals && // Add null check
     // Check for Secretary approval (Level 1) and Mayor approval (Level 2)
     disbursement.approvals.some(approval => 
@@ -1201,12 +1276,14 @@ export default function DisbursementDetailPage() {
 
   const canMarkReleased = session.user.role === "TREASURY" && 
     disbursement && 
+    disbursement.status !== "CANCELLED" &&
     hasCheckIssuance && 
     !hasMarkReleased
 
   // Show Treasury action button for all vouchers after Accounting approval
   const showTreasuryActionButton = session.user.role === "TREASURY" && 
     disbursement && 
+    disbursement.status !== "CANCELLED" &&
     disbursement.approvals && // Add null check
     // Check for Secretary approval (Level 1) and Mayor approval (Level 2)
     disbursement.approvals.some(approval => 
@@ -1458,6 +1535,25 @@ export default function DisbursementDetailPage() {
     })
   }
 
+  if (canCancel) {
+    workflowActions.push({
+      key: "cancel",
+      node: (
+        <Button
+          variant="destructive"
+          onClick={() => {
+            setShowCancelDialog(true)
+            setCancelError("")
+          }}
+          className="w-full bg-slate-600 hover:bg-slate-700 text-white shadow-sm"
+        >
+          <Ban className="mr-2 h-4 w-4" />
+          Cancel Voucher
+        </Button>
+      )
+    })
+  }
+
   workflowActions.push({
     key: "remarks",
     node: (
@@ -1511,6 +1607,28 @@ export default function DisbursementDetailPage() {
             })()}
           </div>
         </div>
+
+        {disbursement.status === "CANCELLED" && (
+          <Alert className="border border-slate-200 bg-slate-50 text-slate-800">
+            <Ban className="h-4 w-4 text-slate-600" />
+            <AlertDescription>
+              This disbursement voucher was cancelled
+              {cancellationDetails?.by ? ` by ${cancellationDetails.by}` : "" }
+              {cancellationDetails?.role ? ` (${cancellationDetails.role})` : ""}
+              {cancellationDetails?.timestamp ? ` on ${formatDateTime(cancellationDetails.timestamp)}.` : "."}
+              {cancellationDetails?.reason && (
+                <span className="block text-sm mt-2 text-slate-700">
+                  Reason: <span className="font-medium text-slate-900">{cancellationDetails.reason}</span>
+                </span>
+              )}
+              {!cancellationDetails?.reason && (
+                <span className="block text-sm mt-2 text-slate-600">
+                  No cancellation reason was provided.
+                </span>
+              )}
+            </AlertDescription>
+          </Alert>
+        )}
 
         {(showWorkflowCard || showTreasuryActionButton) && (
           <div className={`grid gap-4 ${showTreasuryActionButton ? "lg:grid-cols-3" : ""}`}>
@@ -1762,6 +1880,19 @@ export default function DisbursementDetailPage() {
                     <p className="text-sm text-gray-900">{disbursement.remarks}</p>
                   </div>
                 )}
+                {disbursement.status === "CANCELLED" && (
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <p className="text-sm font-medium text-slate-700">Cancellation Details</p>
+                    {cancellationDetails?.reason && (
+                      <p className="text-sm text-slate-900 mt-1">{cancellationDetails.reason}</p>
+                    )}
+                    <p className="text-xs text-slate-600 mt-2">
+                      Cancelled by {cancellationDetails?.by ?? "Unknown user"}
+                      {cancellationDetails?.role ? ` (${cancellationDetails.role})` : ""}
+                      {cancellationDetails?.timestamp ? ` on ${formatDateTime(cancellationDetails.timestamp)}` : ""}
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -1905,7 +2036,7 @@ export default function DisbursementDetailPage() {
               <CardContent>
                 <div className="space-y-4">
                   {disbursement.auditTrails.slice(0, 10).map((trail) => {
-                    const getActionDescription = (action: string, trail: { newValues?: { checkNumber?: string; releaseDate?: string; releaseRecipient?: string; treasuryActionComments?: string } }) => {
+                    const getActionDescription = (action: string, trail: { newValues?: { checkNumber?: string; releaseDate?: string; releaseRecipient?: string; treasuryActionComments?: string; cancellationReason?: string } }) => {
                       switch (action.toUpperCase()) {
                         case "CREATE": return "created the disbursement"
                         case "SUBMIT": return "submitted for review"
@@ -1926,6 +2057,7 @@ export default function DisbursementDetailPage() {
                           return trail.newValues?.releaseRecipient
                             ? `released the disbursement to ${trail.newValues.releaseRecipient}`
                             : "released the disbursement"
+                        case "CANCELLED": return "cancelled the disbursement"
                         case "SUBMIT_REMARKS": return "submitted remarks to source offices"
                         default: return `${action.toLowerCase()}d the disbursement`
                       }
@@ -1947,6 +2079,7 @@ export default function DisbursementDetailPage() {
                         case "TREASURY_REVIEW": return "bg-indigo-600"
                         case "CHECK_ISSUANCE": return "bg-emerald-500"
                         case "MARK_RELEASED": return "bg-green-600"
+                        case "CANCELLED": return "bg-slate-500"
                         case "SUBMIT_REMARKS": return "bg-blue-600"
                         default: return "bg-gray-500"
                       }
@@ -2021,6 +2154,16 @@ export default function DisbursementDetailPage() {
                                   <p className="text-sm text-green-900 mt-1">{trail.newValues.treasuryActionComments}</p>
                                 </div>
                               )}
+                            </div>
+                          )}
+
+                          {/* Show cancellation details */}
+                          {trail.action === "CANCELLED" && (
+                            <div className="mt-2 p-3 bg-slate-100 border border-slate-200 rounded-md">
+                              <span className="text-xs font-medium text-slate-800">Reason:</span>
+                              <p className="text-sm text-slate-900 mt-1">
+                                {trail.newValues?.cancellationReason ? trail.newValues.cancellationReason : "No cancellation reason provided."}
+                              </p>
                             </div>
                           )}
                           
@@ -2244,6 +2387,83 @@ export default function DisbursementDetailPage() {
                   <>
                     <Eye className="mr-2 h-4 w-4" />
                     Confirm Review
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Cancel Confirmation Dialog */}
+        <Dialog
+          open={showCancelDialog}
+          onOpenChange={(open) => {
+            setShowCancelDialog(open)
+            if (!open) {
+              setCancelReason("")
+              setCancelError("")
+              setIsCancelling(false)
+            }
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center">
+                <Ban className="mr-2 h-5 w-5" />
+                Cancel Disbursement Voucher
+              </DialogTitle>
+              <DialogDescription>
+                Cancelling this voucher will halt the workflow and notify relevant offices. This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-2 block">
+                  Cancellation Reason *
+                </label>
+                <Textarea
+                  value={cancelReason}
+                  onChange={(event) => setCancelReason(event.target.value)}
+                  placeholder="Explain why this disbursement voucher is being cancelled"
+                  rows={4}
+                />
+                {cancelError && (
+                  <p className="text-sm text-red-600 mt-2">{cancelError}</p>
+                )}
+              </div>
+              <p className="text-xs text-slate-500">
+                All reviewers and involved departments will be notified about this cancellation.
+              </p>
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowCancelDialog(false)
+                  setCancelReason("")
+                  setCancelError("")
+                }}
+                disabled={isCancelling}
+              >
+                Keep Voucher
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleCancelDisbursement}
+                disabled={isCancelling}
+                className="bg-slate-700 hover:bg-slate-800"
+              >
+                {isCancelling ? (
+                  <>
+                    <Clock className="mr-2 h-4 w-4 animate-spin" />
+                    Cancelling...
+                  </>
+                ) : (
+                  <>
+                    <Ban className="mr-2 h-4 w-4" />
+                    Confirm Cancel
                   </>
                 )}
               </Button>

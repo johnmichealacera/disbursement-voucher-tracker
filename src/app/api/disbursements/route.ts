@@ -107,7 +107,7 @@ export async function GET(request: NextRequest) {
       where.OR = [
         {
           status: {
-            in: ["PENDING", "VALIDATED", "APPROVED", "RELEASED"]
+            in: ["PENDING", "VALIDATED", "APPROVED", "RELEASED", "CANCELLED"]
           }
         },
         {
@@ -119,7 +119,7 @@ export async function GET(request: NextRequest) {
     } else if (session.user.role === "SECRETARY") {
       // Secretary can view all vouchers that need their review
       where.status = {
-        in: ["PENDING", "VALIDATED", "APPROVED", "RELEASED", "REJECTED"]
+        in: ["PENDING", "VALIDATED", "APPROVED", "RELEASED", "REJECTED", "CANCELLED"]
       }
     } else if (session.user.role === "MAYOR") {
       // Mayor can view all vouchers from GSO, HR, and regular offices
@@ -133,7 +133,7 @@ export async function GET(request: NextRequest) {
         },
         {
           status: {
-            in: ["PENDING", "VALIDATED", "APPROVED", "RELEASED", "REJECTED"]
+            in: ["PENDING", "VALIDATED", "APPROVED", "RELEASED", "REJECTED", "CANCELLED"]
           }
         }
       ]
@@ -145,12 +145,12 @@ export async function GET(request: NextRequest) {
     } else if (session.user.role === "BUDGET") {
       // Budget Office can view all vouchers that need their review
       where.status = {
-        in: ["PENDING", "VALIDATED", "APPROVED", "RELEASED", "REJECTED"]
+        in: ["PENDING", "VALIDATED", "APPROVED", "RELEASED", "REJECTED", "CANCELLED"]
       }
     } else if (session.user.role === "TREASURY") {
       // Treasury can view all vouchers that need their review
       where.status = {
-        in: ["PENDING", "VALIDATED", "APPROVED", "RELEASED", "REJECTED"]
+        in: ["PENDING", "VALIDATED", "APPROVED", "RELEASED", "REJECTED", "CANCELLED"]
       }
     }
 
