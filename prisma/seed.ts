@@ -208,7 +208,7 @@ async function main() {
         particulars: 'Community Festival 2024 - Event equipment and decorative materials',
         tags: ['community-event', 'festival', 'entertainment'],
         sourceOffice: ['Community Affairs Office', 'Cultural Office'],
-        status: VoucherStatus.VALIDATED,
+        status: VoucherStatus.PENDING,
         createdById: requester.id,
         items: [
           {
