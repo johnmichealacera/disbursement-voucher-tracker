@@ -118,8 +118,10 @@ function getBacReviewTimestamp(disbursement: DisbursementData): string | undefin
   const reviews = disbursement.bacReviews
     .filter(review => review.status === "APPROVED")
     .sort((a, b) => {
-      const aTime = (a.reviewedAt || a.createdAt) ? new Date(a.reviewedAt || a.createdAt).getTime() : 0
-      const bTime = (b.reviewedAt || b.createdAt) ? new Date(b.reviewedAt || b.createdAt).getTime() : 0
+      const aTimestamp = a.reviewedAt || a.createdAt
+      const bTimestamp = b.reviewedAt || b.createdAt
+      const aTime = aTimestamp ? new Date(aTimestamp).getTime() : 0
+      const bTime = bTimestamp ? new Date(bTimestamp).getTime() : 0
       return bTime - aTime // Most recent first
     })
   const latestReview = reviews[0]
