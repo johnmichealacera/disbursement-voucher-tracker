@@ -3,7 +3,7 @@ import { VoucherStatus, UserRole } from "@prisma/client"
 interface ProgressStep {
   id: string
   label: string
-  status: "completed" | "current" | "pending" | "rejected"
+  status: "completed" | "current" | "pending" | "rejected" | "cancelled"
   percentage: number
   completedBy?: string
 }
@@ -164,7 +164,8 @@ function calculateStandardProgress(disbursement: DisbursementData): ProgressStep
       id: "released",
       label: "Released",
       status: disbursement.status === "RELEASED" ? "completed" : 
-        ["REJECTED", "CANCELLED"].includes(disbursement.status as string) ? "rejected" : "pending",
+        disbursement.status === "REJECTED" ? "rejected" :
+        disbursement.status === "CANCELLED" ? "cancelled" : "pending",
       percentage: 100,
       completedBy: disbursement.status === "RELEASED" ? getAuditActionNames(disbursement, "MARK_RELEASED") : undefined
     }
@@ -323,7 +324,8 @@ function calculateHRProgress(disbursement: DisbursementData): ProgressStep[] {
       id: "released",
       label: "Released",
       status: disbursement.status === "RELEASED" ? "completed" : 
-              ["REJECTED", "CANCELLED"].includes(disbursement.status as string) ? "rejected" : "pending",
+              disbursement.status === "REJECTED" ? "rejected" :
+              disbursement.status === "CANCELLED" ? "cancelled" : "pending",
       percentage: 100,
       completedBy: disbursement.status === "RELEASED" ? getAuditActionNames(disbursement, "MARK_RELEASED") : undefined
     }
@@ -332,12 +334,13 @@ function calculateHRProgress(disbursement: DisbursementData): ProgressStep[] {
   return adjustStepStatuses(steps, disbursement.status)
 }
 
-function getStandardReviewStatus(disbursement: DisbursementData, actionType: string, percentage: number): "completed" | "current" | "pending" | "rejected" {
+function getStandardReviewStatus(disbursement: DisbursementData, actionType: string, percentage: number): "completed" | "current" | "pending" | "rejected" | "cancelled" {
   if (!disbursement || !disbursement.approvals) {
     return "pending"
   }
   
-  if (["REJECTED", "CANCELLED"].includes(disbursement.status as string)) return "rejected"
+  if (disbursement.status === "REJECTED") return "rejected"
+  if (disbursement.status === "CANCELLED") return "cancelled"
   
   // Map action types to approval levels
   const actionToLevel: Record<string, number> = {
@@ -369,8 +372,9 @@ function getStandardReviewStatus(disbursement: DisbursementData, actionType: str
   return allPreviousCompleted ? "current" : "pending"
 }
 
-function getStepStatus(disbursement: DisbursementData, targetStatus: string, percentage: number): "completed" | "current" | "pending" | "rejected" {
-  if (["REJECTED", "CANCELLED"].includes(disbursement.status as string)) return "rejected"
+function getStepStatus(disbursement: DisbursementData, targetStatus: string, percentage: number): "completed" | "current" | "pending" | "rejected" | "cancelled" {
+  if (disbursement.status === "REJECTED") return "rejected"
+  if (disbursement.status === "CANCELLED") return "cancelled"
   
   const statusOrder = ["DRAFT", "PENDING", "VALIDATED", "APPROVED", "RELEASED", "REJECTED", "CANCELLED"]
   const currentIndex = statusOrder.indexOf(disbursement.status as string)
@@ -381,12 +385,13 @@ function getStepStatus(disbursement: DisbursementData, targetStatus: string, per
   return "pending"
 }
 
-function getGSOReviewStatus(disbursement: DisbursementData, actionType: string, percentage: number): "completed" | "current" | "pending" | "rejected" {
+function getGSOReviewStatus(disbursement: DisbursementData, actionType: string, percentage: number): "completed" | "current" | "pending" | "rejected" | "cancelled" {
   if (!disbursement || !disbursement.approvals || !disbursement.auditTrails) {
     return "pending"
   }
   
-  if (["REJECTED", "CANCELLED"].includes(disbursement.status as string)) return "rejected"
+  if (disbursement.status === "REJECTED") return "rejected"
+  if (disbursement.status === "CANCELLED") return "cancelled"
   
   // Special handling for BAC review - check BacReview records instead of approval levels
   if (actionType === "BAC_REVIEW") {
@@ -464,12 +469,13 @@ function getGSOReviewStatus(disbursement: DisbursementData, actionType: string, 
   return allPreviousCompleted ? "current" : "pending"
 }
 
-function getTreasuryStatus(disbursement: DisbursementData, actionType: string, percentage: number): "completed" | "current" | "pending" | "rejected" {
+function getTreasuryStatus(disbursement: DisbursementData, actionType: string, percentage: number): "completed" | "current" | "pending" | "rejected" | "cancelled" {
   if (!disbursement || !disbursement.auditTrails) {
     return "pending"
   }
   
-  if (["REJECTED", "CANCELLED"].includes(disbursement.status as string)) return "rejected"
+  if (disbursement.status === "REJECTED") return "rejected"
+  if (disbursement.status === "CANCELLED") return "cancelled"
   
   const hasCheckIssuance = disbursement.auditTrails.some(trail => 
     trail.action === "CHECK_ISSUANCE" && trail.user.role === "TREASURY"
@@ -528,10 +534,17 @@ function getPreviousGSOActions(actionType: string): string[] {
 }
 
 function adjustStepStatuses(steps: ProgressStep[], currentStatus: string | VoucherStatus): ProgressStep[] {
-  if (["REJECTED", "CANCELLED"].includes(currentStatus as string)) {
+  if (currentStatus === "REJECTED") {
     return steps.map(step => ({
       ...step,
       status: step.status === "completed" ? "completed" : "rejected" as const
+    }))
+  }
+  
+  if (currentStatus === "CANCELLED") {
+    return steps.map(step => ({
+      ...step,
+      status: step.status === "completed" ? "completed" : "cancelled" as const
     }))
   }
 

@@ -51,6 +51,7 @@ import {
   XCircle,
   AlertCircle,
   Eye,
+  EyeOff,
   MessageSquare,
   Wallet,
   X,
@@ -155,6 +156,11 @@ export default function DisbursementDetailPage() {
   const [reviewPasswordError, setReviewPasswordError] = useState("")
   const [treasuryPassword, setTreasuryPassword] = useState("")
   const [treasuryPasswordError, setTreasuryPasswordError] = useState("")
+  const [showPasswords, setShowPasswords] = useState({
+    review: false,
+    delete: false,
+    treasury: false
+  })
   const [showTreasuryDialog, setShowTreasuryDialog] = useState(false)
   const [treasuryAction, setTreasuryAction] = useState<"CHECK_ISSUANCE" | "MARK_RELEASED" | null>(null)
   const [showCancelDialog, setShowCancelDialog] = useState(false)
@@ -392,6 +398,7 @@ export default function DisbursementDetailPage() {
         setDisbursement(responseData.disbursement)
         setShowReviewDialog(false)
         setReviewPassword("")
+        setShowPasswords(prev => ({ ...prev, review: false }))
       } else {
         const errorData = await response.json()
         setError(errorData.error || `Failed to ${status?.toLowerCase()} disbursement`)
@@ -438,6 +445,7 @@ export default function DisbursementDetailPage() {
         setDisbursement(updatedDisbursement)
         setShowReviewDialog(false)
         setReviewPassword("")
+        setShowPasswords(prev => ({ ...prev, review: false }))
         
         // Force refresh the page to ensure UI updates
         setTimeout(() => {
@@ -541,6 +549,7 @@ export default function DisbursementDetailPage() {
         setDisbursement(updatedDisbursement)
         setShowReviewDialog(false)
         setReviewPassword("")
+        setShowPasswords(prev => ({ ...prev, review: false }))
       } else {
         const errorData = await response.json()
         setError(errorData.error || "Failed to BAC review voucher")
@@ -600,6 +609,7 @@ export default function DisbursementDetailPage() {
         setDisbursement(responseData.disbursement)
         setShowReviewDialog(false)
         setReviewPassword("")
+        setShowPasswords(prev => ({ ...prev, review: false }))
       } else {
         const errorData = await response.json()
         setError(errorData.error || "Failed to Budget review voucher")
@@ -660,6 +670,7 @@ export default function DisbursementDetailPage() {
         setDisbursement(responseData.disbursement)
         setShowReviewDialog(false)
         setReviewPassword("")
+        setShowPasswords(prev => ({ ...prev, review: false }))
       } else {
         const errorData = await response.json()
         setError(errorData.error || "Failed to Accounting review voucher")
@@ -732,6 +743,7 @@ export default function DisbursementDetailPage() {
       setShowTreasuryDialog(false)
       setTreasuryPassword("")
       setTreasuryAction(null)
+      setShowPasswords(prev => ({ ...prev, treasury: false }))
       setCheckNumber("") // Clear check number after successful issuance
       setTreasuryReleaseRecipient("")
       await fetchDisbursement()
@@ -783,6 +795,7 @@ export default function DisbursementDetailPage() {
       setShowTreasuryDialog(false)
       setTreasuryPassword("")
       setTreasuryAction(null)
+      setShowPasswords(prev => ({ ...prev, treasury: false }))
       setCheckNumber("") // Clear check number after successful issuance
       setTreasuryReleaseRecipient("")
       await fetchDisbursement()
@@ -2311,6 +2324,7 @@ export default function DisbursementDetailPage() {
           if (!open) {
             setReviewPassword("")
             setReviewPasswordError("")
+            setShowPasswords(prev => ({ ...prev, review: false }))
           }
         }}>
           <DialogContent>
@@ -2333,16 +2347,31 @@ export default function DisbursementDetailPage() {
                 <label className="text-sm font-medium text-gray-700 mb-2 block">
                   Enter your password to confirm review *
                 </label>
-                <Input
-                  type="password"
-                  placeholder="Enter your password"
-                  value={reviewPassword}
-                  onChange={(e) => {
-                    setReviewPassword(e.target.value)
-                    setReviewPasswordError("")
-                  }}
-                  className={reviewPasswordError ? "border-red-500" : ""}
-                />
+                <div className="relative">
+                  <Input
+                    type={showPasswords.review ? "text" : "password"}
+                    placeholder="Enter your password"
+                    value={reviewPassword}
+                    onChange={(e) => {
+                      setReviewPassword(e.target.value)
+                      setReviewPasswordError("")
+                    }}
+                    className={`pr-10 ${reviewPasswordError ? "border-red-500" : ""}`}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowPasswords(prev => ({ ...prev, review: !prev.review }))}
+                  >
+                    {showPasswords.review ? (
+                      <EyeOff className="h-4 w-4 text-gray-400" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-gray-400" />
+                    )}
+                  </Button>
+                </div>
                 {reviewPasswordError && (
                   <p className="text-sm text-red-600 mt-1">{reviewPasswordError}</p>
                 )}
@@ -2356,6 +2385,7 @@ export default function DisbursementDetailPage() {
                   setShowReviewDialog(false)
                   setReviewPassword("")
                   setReviewPasswordError("")
+                  setShowPasswords(prev => ({ ...prev, review: false }))
                 }}
                 disabled={isApproving}
               >
@@ -2477,6 +2507,7 @@ export default function DisbursementDetailPage() {
           if (!open) {
             setDeletePassword("")
             setPasswordError("")
+            setShowPasswords(prev => ({ ...prev, delete: false }))
           }
         }}>
           <DialogContent>
@@ -2499,16 +2530,31 @@ export default function DisbursementDetailPage() {
                 <label className="text-sm font-medium text-gray-700 mb-2 block">
                   Enter your password to confirm deletion *
                 </label>
-                <Input
-                  type="password"
-                  placeholder="Enter your password"
-                  value={deletePassword}
-                  onChange={(e) => {
-                    setDeletePassword(e.target.value)
-                    setPasswordError("")
-                  }}
-                  className={passwordError ? "border-red-500" : ""}
-                />
+                <div className="relative">
+                  <Input
+                    type={showPasswords.delete ? "text" : "password"}
+                    placeholder="Enter your password"
+                    value={deletePassword}
+                    onChange={(e) => {
+                      setDeletePassword(e.target.value)
+                      setPasswordError("")
+                    }}
+                    className={`pr-10 ${passwordError ? "border-red-500" : ""}`}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowPasswords(prev => ({ ...prev, delete: !prev.delete }))}
+                  >
+                    {showPasswords.delete ? (
+                      <EyeOff className="h-4 w-4 text-gray-400" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-gray-400" />
+                    )}
+                  </Button>
+                </div>
                 {passwordError && (
                   <p className="text-sm text-red-600 mt-1">{passwordError}</p>
                 )}
@@ -2522,6 +2568,7 @@ export default function DisbursementDetailPage() {
                   setShowDeleteDialog(false)
                   setDeletePassword("")
                   setPasswordError("")
+                  setShowPasswords(prev => ({ ...prev, delete: false }))
                 }}
                 disabled={isDeleting}
               >
@@ -2555,6 +2602,7 @@ export default function DisbursementDetailPage() {
             setTreasuryPassword("")
             setTreasuryPasswordError("")
             setTreasuryAction(null)
+            setShowPasswords(prev => ({ ...prev, treasury: false }))
           }
         }}>
           <DialogContent>
@@ -2591,16 +2639,31 @@ export default function DisbursementDetailPage() {
                 <label className="text-sm font-medium text-gray-700 mb-2 block">
                   Enter your password to confirm Treasury action *
                 </label>
-                <Input
-                  type="password"
-                  placeholder="Enter your password"
-                  value={treasuryPassword}
-                  onChange={(e) => {
-                    setTreasuryPassword(e.target.value)
-                    setTreasuryPasswordError("")
-                  }}
-                  className={treasuryPasswordError ? "border-red-500" : ""}
-                />
+                <div className="relative">
+                  <Input
+                    type={showPasswords.treasury ? "text" : "password"}
+                    placeholder="Enter your password"
+                    value={treasuryPassword}
+                    onChange={(e) => {
+                      setTreasuryPassword(e.target.value)
+                      setTreasuryPasswordError("")
+                    }}
+                    className={`pr-10 ${treasuryPasswordError ? "border-red-500" : ""}`}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowPasswords(prev => ({ ...prev, treasury: !prev.treasury }))}
+                  >
+                    {showPasswords.treasury ? (
+                      <EyeOff className="h-4 w-4 text-gray-400" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-gray-400" />
+                    )}
+                  </Button>
+                </div>
                 {treasuryPasswordError && (
                   <p className="text-sm text-red-600 mt-1">{treasuryPasswordError}</p>
                 )}
@@ -2615,6 +2678,7 @@ export default function DisbursementDetailPage() {
                   setTreasuryPassword("")
                   setTreasuryPasswordError("")
                   setTreasuryAction(null)
+                  setShowPasswords(prev => ({ ...prev, treasury: false }))
                 }}
                 disabled={isApproving}
               >

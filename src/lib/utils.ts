@@ -58,7 +58,7 @@ export function getStatusColor(status: string | undefined | null): string {
     case 'rejected':
       return 'bg-red-100 text-red-800'
     case 'cancelled':
-      return 'bg-slate-200 text-slate-900 border border-slate-300'
+      return 'bg-red-100 text-red-800'
     default:
       return 'bg-gray-100 text-gray-800'
   }

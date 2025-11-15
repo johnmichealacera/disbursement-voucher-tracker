@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useSession, signOut } from "next-auth/react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -25,7 +25,9 @@ import {
   X,
   LogOut,
   User,
-  Settings
+  Settings,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react"
 import { NotificationBell } from "@/components/notifications/notification-bell"
 import Footer from "./footer"
@@ -78,6 +80,20 @@ export function MainLayout({ children }: MainLayoutProps) {
   const { data: session } = useSession()
   const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [isCollapsed, setIsCollapsed] = useState(false)
+
+  // Load collapsed state from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem("sidebarCollapsed")
+    if (saved !== null) {
+      setIsCollapsed(JSON.parse(saved))
+    }
+  }, [])
+
+  // Save collapsed state to localStorage
+  useEffect(() => {
+    localStorage.setItem("sidebarCollapsed", JSON.stringify(isCollapsed))
+  }, [isCollapsed])
 
   if (!session) {
     return null
@@ -106,31 +122,55 @@ export function MainLayout({ children }: MainLayoutProps) {
       {/* Sidebar */}
       <div
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 flex flex-col",
-          sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+          "fixed inset-y-0 left-0 z-50 bg-white shadow-lg transform transition-all duration-300 ease-in-out lg:relative lg:translate-x-0 flex flex-col",
+          sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
+          isCollapsed ? "lg:w-16" : "w-64"
         )}
       >
         {/* Header */}
-        <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200 flex-shrink-0">
-          <div className="flex items-center">
+        <div className={cn(
+          "flex items-center justify-between h-16 border-b border-gray-200 flex-shrink-0 transition-all duration-300",
+          isCollapsed ? "px-4" : "px-6"
+        )}>
+          <div className={cn(
+            "flex items-center transition-all duration-300",
+            isCollapsed ? "justify-center w-full" : ""
+          )}>
             <div className="flex-shrink-0">
               <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
                 <FileText className="w-5 h-5 text-white" />
               </div>
             </div>
-            <div className="ml-3">
-              <h1 className="text-lg font-semibold text-gray-900">DTS</h1>
-              <p className="text-xs text-gray-500">Municipality</p>
-            </div>
+            {!isCollapsed && (
+              <div className="ml-3">
+                <h1 className="text-lg font-semibold text-gray-900">DTS</h1>
+                <p className="text-xs text-gray-500">Municipality</p>
+              </div>
+            )}
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="lg:hidden"
-            onClick={() => setSidebarOpen(false)}
-          >
-            <X className="w-5 h-5" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="hidden lg:flex"
+              onClick={() => setIsCollapsed(!isCollapsed)}
+              title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            >
+              {isCollapsed ? (
+                <ChevronRight className="w-4 h-4" />
+              ) : (
+                <ChevronLeft className="w-4 h-4" />
+              )}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="lg:hidden"
+              onClick={() => setSidebarOpen(false)}
+            >
+              <X className="w-5 h-5" />
+            </Button>
+          </div>
         </div>
 
         {/* Navigation */}
@@ -143,20 +183,31 @@ export function MainLayout({ children }: MainLayoutProps) {
                   key={item.name}
                   href={item.href}
                   className={cn(
-                    "group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors",
+                    "group flex items-center text-sm font-medium rounded-md transition-colors relative",
                     isActive
                       ? "bg-blue-50 text-blue-700"
-                      : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+                      : "text-gray-700 hover:bg-gray-50 hover:text-gray-900",
+                    isCollapsed ? "px-3 py-2 justify-center" : "px-3 py-2"
                   )}
                   onClick={() => setSidebarOpen(false)}
+                  title={isCollapsed ? item.name : undefined}
                 >
                   <item.icon
                     className={cn(
-                      "mr-3 h-5 w-5 flex-shrink-0",
-                      isActive ? "text-blue-500" : "text-gray-400 group-hover:text-gray-500"
+                      "flex-shrink-0",
+                      isActive ? "text-blue-500" : "text-gray-400 group-hover:text-gray-500",
+                      isCollapsed ? "h-5 w-5" : "mr-3 h-5 w-5"
                     )}
                   />
-                  {item.name}
+                  {!isCollapsed && (
+                    <span className="truncate">{item.name}</span>
+                  )}
+                  {/* Tooltip for collapsed state */}
+                  {isCollapsed && (
+                    <span className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50 transition-opacity">
+                      {item.name}
+                    </span>
+                  )}
                 </Link>
               )
             })}
@@ -164,21 +215,29 @@ export function MainLayout({ children }: MainLayoutProps) {
         </nav>
 
         {/* User info at bottom */}
-        <div className="flex-shrink-0 p-4 border-t border-gray-200 bg-gray-50">
-          <div className="flex items-center">
-            <Avatar className="h-8 w-8">
+        <div className={cn(
+          "flex-shrink-0 border-t border-gray-200 bg-gray-50 transition-all duration-300",
+          isCollapsed ? "p-2" : "p-4"
+        )}>
+          <div className={cn(
+            "flex items-center",
+            isCollapsed ? "justify-center" : ""
+          )}>
+            <Avatar className="h-8 w-8 flex-shrink-0">
               <AvatarFallback className="bg-blue-100 text-blue-700 text-sm">
                 {userInitials}
               </AvatarFallback>
             </Avatar>
-            <div className="ml-3 flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">
-                {session.user.name}
-              </p>
-              <p className="text-xs text-gray-500 truncate">
-                {session.user.role.replace("_", " ").toLowerCase()}
-              </p>
-            </div>
+            {!isCollapsed && (
+              <div className="ml-3 flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 truncate">
+                  {session.user.name}
+                </p>
+                <p className="text-xs text-gray-500 truncate">
+                  {session.user.role.replace("_", " ").toLowerCase()}
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>
