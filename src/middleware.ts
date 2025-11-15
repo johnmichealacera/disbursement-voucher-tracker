@@ -7,6 +7,13 @@ export default withAuth(
     const isAuth = !!token
     const isAuthPage = req.nextUrl.pathname.startsWith("/login")
     const isApiAuthRoute = req.nextUrl.pathname.startsWith("/api/auth")
+    const pathname = req.nextUrl.pathname
+
+    // Allow static files (images, fonts, etc.)
+    const isStaticFile = /\.(jpg|jpeg|png|gif|svg|ico|webp|woff|woff2|ttf|eot|pdf)$/i.test(pathname)
+    if (isStaticFile) {
+      return NextResponse.next()
+    }
 
     // Allow API auth routes
     if (isApiAuthRoute) {
@@ -25,7 +32,6 @@ export default withAuth(
 
     // Role-based access control
     if (isAuth && token) {
-      const { pathname } = req.nextUrl
       const userRole = token.role as string
 
       // Admin routes
@@ -44,9 +50,17 @@ export default withAuth(
   {
     callbacks: {
       authorized: ({ token, req }) => {
+        const pathname = req.nextUrl.pathname
+        
+        // Allow static files without authentication
+        const isStaticFile = /\.(jpg|jpeg|png|gif|svg|ico|webp|woff|woff2|ttf|eot|pdf)$/i.test(pathname)
+        if (isStaticFile) {
+          return true
+        }
+        
         // Allow access to login page and API auth routes without token
-        if (req.nextUrl.pathname.startsWith("/login") || 
-            req.nextUrl.pathname.startsWith("/api/auth")) {
+        if (pathname.startsWith("/login") || 
+            pathname.startsWith("/api/auth")) {
           return true
         }
         
@@ -64,8 +78,8 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * - public folder
+     * - Static file extensions (handled in middleware function)
      */
-    "/((?!_next/static|_next/image|favicon.ico|public/).*)",
+    "/((?!_next/static|_next/image|favicon.ico).*)",
   ],
 }

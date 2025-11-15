@@ -107,8 +107,8 @@ export default function DashboardPage() {
       title: "Cancelled",
       value: stats?.cancelledVouchers || 0,
       icon: Ban,
-      color: "text-slate-600",
-      bgColor: "bg-slate-100"
+      color: "text-red-600",
+      bgColor: "bg-red-50"
     }
   ]
 
@@ -131,46 +131,78 @@ export default function DashboardPage() {
 
   return (
     <MainLayout>
-      <div className="p-6 space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-            <p className="text-gray-600">
-              Welcome back, {session.user.name}
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline" className="px-3 py-1 text-xs">
-              {session.user.role.replace("_", " ")}
-            </Badge>
-            {session.user.department && (
-              <Badge variant="secondary" className="px-3 py-1 text-xs">
-                {session.user.department}
-              </Badge>
-            )}
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20">
+        {/* Hero Section */}
+        <div className="relative overflow-hidden bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600">
+          <div className="absolute inset-0 bg-[url('/socorro-aerial-view.jpg')] bg-cover bg-center opacity-10"></div>
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-900/80 via-indigo-900/80 to-purple-900/80"></div>
+          
+          <div className="relative px-6 py-12 sm:py-16">
+            <div className="max-w-7xl mx-auto">
+              <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                <div className="flex items-center gap-6">
+                  <div className="relative">
+                    <div className="absolute inset-0 bg-white/20 backdrop-blur-sm rounded-2xl blur-xl"></div>
+                    <div className="relative bg-white/10 backdrop-blur-md rounded-2xl p-3 border border-white/20 shadow-2xl">
+                      <img 
+                        src="/socorro-logo.png" 
+                        alt="Socorro Logo" 
+                        className="h-16 w-auto object-contain"
+                        onError={(e) => {
+                          console.error("Failed to load logo. Check if /socorro-logo.png exists in public folder");
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <h1 className="text-3xl sm:text-4xl font-bold text-white drop-shadow-lg">
+                      Welcome back, {session.user.name?.split(' ')[0]}!
+                    </h1>
+                    <p className="text-blue-100 text-lg mt-1">
+                      Municipality of Socorro - Disbursement Tracking System
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  <Badge className="px-4 py-2 text-sm bg-white/20 backdrop-blur-sm border-white/30 text-white font-medium">
+                    {session.user.role.replace("_", " ")}
+                  </Badge>
+                  {session.user.department && (
+                    <Badge className="px-4 py-2 text-sm bg-white/20 backdrop-blur-sm border-white/30 text-white font-medium">
+                      {session.user.department}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
+
+        <div className="p-6 space-y-6 max-w-7xl mx-auto">
 
         {/* Stats Cards */}
         {statsLoading ? (
           <DashboardStatsSkeleton />
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
             {statCards.map((card) => (
-              <Card key={card.title}>
+              <Card 
+                key={card.title}
+                className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 bg-white/80 backdrop-blur-sm"
+              >
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">
+                    <div className="flex-1">
+                      <p className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1">
                         {card.title}
                       </p>
-                      <p className="text-2xl font-bold text-gray-900">
+                      <p className="text-3xl font-bold text-gray-900">
                         {card.value}
                       </p>
                     </div>
-                    <div className={`p-3 rounded-full ${card.bgColor}`}>
-                      <card.icon className={`h-6 w-6 ${card.color}`} />
+                    <div className={`p-4 rounded-xl ${card.bgColor} shadow-md`}>
+                      <card.icon className={`h-7 w-7 ${card.color}`} />
                     </div>
                   </div>
                 </CardContent>
@@ -183,21 +215,29 @@ export default function DashboardPage() {
         {statsLoading ? (
           <AmountCardsSkeleton />
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {amountCards.map((card) => (
-              <Card key={card.title}>
-                <CardContent className="p-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            {amountCards.map((card, index) => (
+              <Card 
+                key={card.title}
+                className={`border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 overflow-hidden relative ${
+                  index === 0 
+                    ? 'bg-gradient-to-br from-emerald-500 to-teal-600' 
+                    : 'bg-gradient-to-br from-purple-500 to-indigo-600'
+                }`}
+              >
+                <div className="absolute inset-0 bg-[url('/socorro-aerial-view.jpg')] bg-cover bg-center opacity-10"></div>
+                <CardContent className="p-6 relative z-10">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-gray-600">
+                      <p className="text-sm font-medium text-white/90 uppercase tracking-wide mb-2">
                         {card.title}
                       </p>
-                      <p className="text-2xl font-bold text-gray-900">
+                      <p className="text-3xl font-bold text-white drop-shadow-lg">
                         {card.value}
                       </p>
                     </div>
-                    <div className={`p-3 rounded-full ${card.bgColor}`}>
-                      <card.icon className={`h-6 w-6 ${card.color}`} />
+                    <div className="p-4 rounded-xl bg-white/20 backdrop-blur-sm border border-white/30 shadow-lg">
+                      <card.icon className="h-8 w-8 text-white" />
                     </div>
                   </div>
                 </CardContent>
@@ -207,16 +247,16 @@ export default function DashboardPage() {
         )}
 
         {/* Recent Vouchers */}
-        <Card>
-          <CardHeader>
+        <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+          <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>Recent Disbursement Vouchers</CardTitle>
-                <CardDescription>
+                <CardTitle className="text-xl font-bold text-gray-900">Recent Disbursement Vouchers</CardTitle>
+                <CardDescription className="text-gray-600 mt-1">
                   Latest vouchers in the system
                 </CardDescription>
               </div>
-              <Button asChild variant="outline">
+              <Button asChild variant="outline" className="border-blue-200 hover:bg-blue-50">
                 <Link href="/disbursements">View All</Link>
               </Button>
             </div>
@@ -249,7 +289,7 @@ export default function DashboardPage() {
                 {recentVouchers?.map((voucher) => (
                   <div
                     key={voucher.id}
-                    className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors gap-4"
+                    className="flex flex-col sm:flex-row sm:items-center justify-between p-5 border border-gray-200 rounded-xl hover:border-blue-300 hover:shadow-md bg-white hover:bg-gradient-to-r hover:from-blue-50/50 hover:to-indigo-50/50 transition-all duration-300 gap-4"
                   >
                     <div className="flex-1">
                       <div className="flex items-start space-x-3">
@@ -312,22 +352,29 @@ export default function DashboardPage() {
 
         {/* Quick Actions */}
         {["REQUESTER", "GSO", "HR"].includes(session.user.role) && (
-          <Card>
+          <Card className="border-0 shadow-lg bg-gradient-to-br from-blue-50 to-indigo-50">
             <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
-              <CardDescription>
+              <CardTitle className="text-xl font-bold text-gray-900">Quick Actions</CardTitle>
+              <CardDescription className="text-gray-600">
                 Common tasks you can perform
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="flex flex-col sm:flex-row gap-4">
-                <Button asChild className="w-full sm:w-auto">
+                <Button 
+                  asChild 
+                  className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg shadow-blue-500/50"
+                >
                   <Link href="/create">
                     <FileText className="mr-2 h-4 w-4" />
                     Create New Voucher
                   </Link>
                 </Button>
-                <Button asChild variant="outline" className="w-full sm:w-auto">
+                <Button 
+                  asChild 
+                  variant="outline" 
+                  className="w-full sm:w-auto border-blue-200 hover:bg-blue-50 hover:border-blue-300"
+                >
                   <Link href="/disbursements?status=DRAFT">
                     View Draft Vouchers
                   </Link>
@@ -336,6 +383,7 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         )}
+        </div>
       </div>
     </MainLayout>
   )

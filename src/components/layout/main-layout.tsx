@@ -129,22 +129,38 @@ export function MainLayout({ children }: MainLayoutProps) {
       >
         {/* Header */}
         <div className={cn(
-          "flex items-center justify-between h-16 border-b border-gray-200 flex-shrink-0 transition-all duration-300",
-          isCollapsed ? "px-4" : "px-6"
+          "flex items-center justify-between border-b border-gray-200 flex-shrink-0 transition-all duration-300",
+          isCollapsed ? "px-3 py-4 h-16" : "px-4 py-3 min-h-16"
         )}>
           <div className={cn(
-            "flex items-center transition-all duration-300",
-            isCollapsed ? "justify-center w-full" : ""
+            "flex items-center transition-all duration-300 w-full",
+            isCollapsed ? "justify-center" : "gap-3"
           )}>
             <div className="flex-shrink-0">
-              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                <FileText className="w-5 h-5 text-white" />
-              </div>
+              {isCollapsed ? (
+                <img 
+                  src="/socorro-logo.png" 
+                  alt="Socorro Logo" 
+                  className="h-8 w-8 object-contain"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              ) : (
+                <img 
+                  src="/socorro-logo.png" 
+                  alt="Socorro Logo" 
+                  className="h-10 w-10 object-contain"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              )}
             </div>
             {!isCollapsed && (
-              <div className="ml-3">
-                <h1 className="text-lg font-semibold text-gray-900">DTS</h1>
-                <p className="text-xs text-gray-500">Municipality</p>
+              <div className="flex-1 min-w-0">
+                <h1 className="text-sm font-semibold text-gray-900 leading-tight truncate">Socorro Municipality</h1>
+                <p className="text-[10px] text-gray-500 leading-tight truncate mt-0.5">Disbursement Tracking System</p>
               </div>
             )}
           </div>
