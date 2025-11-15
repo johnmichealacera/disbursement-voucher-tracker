@@ -85,11 +85,43 @@ const createUserSchema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("Invalid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
-  role: z.enum(["REQUESTER", "ACCOUNTING", "BUDGET", "TREASURY", "MAYOR", "ADMIN", "DEPARTMENT_HEAD", "FINANCE_HEAD", "GSO", "HR", "BAC"]),
+  role: z.enum(["REQUESTER", "ACCOUNTING", "BUDGET", "TREASURY", "MAYOR", "ADMIN", "DEPARTMENT_HEAD", "FINANCE_HEAD", "GSO", "HR", "BAC", "SECRETARY"]),
   department: z.string().optional()
+}).refine((data) => {
+  // Department is required for REQUESTER role
+  if (data.role === "REQUESTER") {
+    return data.department && data.department.trim().length > 0
+  }
+  return true
+}, {
+  message: "Department is required for Requester role",
+  path: ["department"]
 })
 
 type CreateUserFormData = z.infer<typeof createUserSchema>
+
+const updateUserSchema = z.object({
+  name: z.string().min(1).optional(),
+  email: z.string().email().optional(),
+  password: z.union([
+    z.string().min(6, "Password must be at least 6 characters"),
+    z.literal("")
+  ]).optional(),
+  role: z.enum(["REQUESTER", "ACCOUNTING", "BUDGET", "TREASURY", "MAYOR", "ADMIN", "DEPARTMENT_HEAD", "FINANCE_HEAD", "GSO", "HR", "BAC", "SECRETARY"]).optional(),
+  department: z.string().optional(),
+  isActive: z.boolean().optional()
+}).refine((data) => {
+  // Department is required for REQUESTER role
+  if (data.role === "REQUESTER") {
+    return data.department && data.department.trim().length > 0
+  }
+  return true
+}, {
+  message: "Department is required for Requester role",
+  path: ["department"]
+})
+
+type UpdateUserFormData = z.infer<typeof updateUserSchema>
 
 const roleLabels = {
   REQUESTER: "Requester",
@@ -102,7 +134,8 @@ const roleLabels = {
   FINANCE_HEAD: "Finance Head",
   GSO: "General Services Office",
   HR: "Human Resources",
-  BAC: "Bids and Awards Committee"
+  BAC: "Bids and Awards Committee",
+  SECRETARY: "Secretary"
 }
 
 const roleColors = {
@@ -116,7 +149,8 @@ const roleColors = {
   REQUESTER: "bg-gray-100 text-gray-800",
   GSO: "bg-teal-100 text-teal-800",
   HR: "bg-pink-100 text-pink-800",
-  BAC: "bg-violet-100 text-violet-800"
+  BAC: "bg-violet-100 text-violet-800",
+  SECRETARY: "bg-cyan-100 text-cyan-800"
 }
 
 export default function AdminUsersPage() {
@@ -133,8 +167,11 @@ export default function AdminUsersPage() {
   })
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
+  const [editingUser, setEditingUser] = useState<User | null>(null)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [isUpdating, setIsUpdating] = useState(false)
 
-  const form = useForm<CreateUserFormData>({
+  const createForm = useForm<CreateUserFormData>({
     resolver: zodResolver(createUserSchema),
     defaultValues: {
       name: "",
@@ -142,6 +179,18 @@ export default function AdminUsersPage() {
       password: "",
       role: "REQUESTER",
       department: ""
+    }
+  })
+
+  const editForm = useForm<UpdateUserFormData>({
+    resolver: zodResolver(updateUserSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      password: "",
+      role: "REQUESTER",
+      department: "",
+      isActive: true
     }
   })
 
@@ -200,7 +249,7 @@ export default function AdminUsersPage() {
 
       if (response.ok) {
         setIsCreateDialogOpen(false)
-        form.reset()
+        createForm.reset()
         fetchUsers(pagination?.page || 1)
       } else {
         const errorData = await response.json()
@@ -210,6 +259,56 @@ export default function AdminUsersPage() {
       setError("An error occurred while creating the user")
     } finally {
       setIsCreating(false)
+    }
+  }
+
+  const handleEditUser = (user: User) => {
+    setEditingUser(user)
+    editForm.reset({
+      name: user.name,
+      email: user.email,
+      password: "",
+      role: user.role as "REQUESTER" | "ACCOUNTING" | "BUDGET" | "TREASURY" | "MAYOR" | "ADMIN" | "DEPARTMENT_HEAD" | "FINANCE_HEAD" | "GSO" | "HR" | "BAC" | "SECRETARY",
+      department: user.department || "",
+      isActive: user.isActive
+    })
+    setIsEditDialogOpen(true)
+  }
+
+  const handleUpdateUser = async (data: UpdateUserFormData) => {
+    if (!editingUser) return
+
+    setIsUpdating(true)
+    setError("")
+
+    try {
+      // Remove password from update if it's empty
+      const updateData = { ...data }
+      if (!updateData.password || updateData.password.trim() === "") {
+        delete updateData.password
+      }
+
+      const response = await fetch(`/api/users/${editingUser.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updateData),
+      })
+
+      if (response.ok) {
+        setIsEditDialogOpen(false)
+        setEditingUser(null)
+        editForm.reset()
+        fetchUsers(pagination?.page || 1)
+      } else {
+        const errorData = await response.json()
+        setError(errorData.error || "Failed to update user")
+      }
+    } catch (error) {
+      setError("An error occurred while updating the user")
+    } finally {
+      setIsUpdating(false)
     }
   }
 
@@ -292,13 +391,13 @@ export default function AdminUsersPage() {
                   Add a new user to the system with appropriate role and permissions.
                 </DialogDescription>
               </DialogHeader>
-              <Form {...form}>
+              <Form {...createForm}>
                 <form
-                  onSubmit={form.handleSubmit(handleCreateUser)}
+                  onSubmit={createForm.handleSubmit(handleCreateUser)}
                   className="space-y-4"
                 >
                   <FormField
-                    control={form.control}
+                    control={createForm.control}
                     name="name"
                     render={({ field }) => (
                       <FormItem>
@@ -311,7 +410,7 @@ export default function AdminUsersPage() {
                     )}
                   />
                   <FormField
-                    control={form.control}
+                    control={createForm.control}
                     name="email"
                     render={({ field }) => (
                       <FormItem>
@@ -324,7 +423,7 @@ export default function AdminUsersPage() {
                     )}
                   />
                   <FormField
-                    control={form.control}
+                    control={createForm.control}
                     name="password"
                     render={({ field }) => (
                       <FormItem>
@@ -337,7 +436,7 @@ export default function AdminUsersPage() {
                     )}
                   />
                   <FormField
-                    control={form.control}
+                    control={createForm.control}
                     name="role"
                     render={({ field }) => (
                       <FormItem>
@@ -375,25 +474,185 @@ export default function AdminUsersPage() {
                       </FormItem>
                     )}
                   />
-                  <FormField
-                    control={form.control}
-                    name="department"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Department</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter department (optional)" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  {createForm.watch("role") === "REQUESTER" && (
+                    <FormField
+                      control={createForm.control}
+                      name="department"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Department *</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Enter department" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
                   <DialogFooter>
                     <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                       Cancel
                     </Button>
                     <Button type="submit" disabled={isCreating}>
                       {isCreating ? "Creating..." : "Create User"}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
+
+          {/* Edit User Dialog */}
+          <Dialog open={isEditDialogOpen} onOpenChange={(open) => {
+            setIsEditDialogOpen(open)
+            if (!open) {
+              setEditingUser(null)
+              editForm.reset()
+            }
+          }}>
+            <DialogContent className="sm:max-w-[480px]">
+              <DialogHeader>
+                <DialogTitle>Edit User</DialogTitle>
+                <DialogDescription>
+                  Update user information and permissions.
+                </DialogDescription>
+              </DialogHeader>
+              <Form {...editForm}>
+                <form
+                  onSubmit={editForm.handleSubmit(handleUpdateUser)}
+                  className="space-y-4"
+                >
+                  <FormField
+                    control={editForm.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Full Name *</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Enter full name" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={editForm.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email Address *</FormLabel>
+                        <FormControl>
+                          <Input type="email" placeholder="Enter email address" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={editForm.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Password</FormLabel>
+                        <FormControl>
+                          <Input type="password" placeholder="Leave blank to keep current password" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={editForm.control}
+                    name="role"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Role *</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="h-11 border border-gray-200 bg-white shadow-sm hover:border-blue-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200">
+                              <SelectValue placeholder="Select a role" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent className="bg-white border border-gray-100 shadow-xl rounded-xl overflow-hidden p-2 space-y-1">
+                            {Object.entries(roleLabels).map(([value, label]) => (
+                              <SelectItem
+                                key={value}
+                                value={value}
+                                className="rounded-lg px-3 py-2 data-[highlighted=true]:bg-blue-50 data-[highlighted=true]:text-blue-700"
+                              >
+                                <div className="flex items-center justify-between gap-3">
+                                  <span className="font-medium text-gray-800">{label}</span>
+                                  <Badge
+                                    variant="secondary"
+                                    className={`${roleColors[value as keyof typeof roleColors]} px-2 py-0.5 text-xs font-semibold`}
+                                  >
+                                    {value}
+                                  </Badge>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  {editForm.watch("role") === "REQUESTER" && (
+                    <FormField
+                      control={editForm.control}
+                      name="department"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Department *</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Enter department" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+                  <FormField
+                    control={editForm.control}
+                    name="isActive"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                        <div className="space-y-0.5">
+                          <FormLabel>Account Status</FormLabel>
+                          <div className="text-sm text-gray-500">
+                            {field.value ? "User can access the system" : "User is deactivated"}
+                          </div>
+                        </div>
+                        <FormControl>
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              checked={field.value}
+                              onChange={field.onChange}
+                              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                          </div>
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <DialogFooter>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={() => {
+                        setIsEditDialogOpen(false)
+                        setEditingUser(null)
+                        editForm.reset()
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={isUpdating}>
+                      {isUpdating ? "Updating..." : "Update User"}
                     </Button>
                   </DialogFooter>
                 </form>
@@ -564,7 +823,11 @@ export default function AdminUsersPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center space-x-2">
-                          <Button variant="ghost" size="sm">
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => handleEditUser(user)}
+                          >
                             <Edit className="h-4 w-4" />
                           </Button>
                           <Button

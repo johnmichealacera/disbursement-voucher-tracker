@@ -10,16 +10,34 @@ const createUserSchema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("Invalid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
-  role: z.enum(["REQUESTER", "ACCOUNTING", "BUDGET", "TREASURY", "MAYOR", "ADMIN", "DEPARTMENT_HEAD", "FINANCE_HEAD", "GSO", "HR", "BAC"]),
+  role: z.enum(["REQUESTER", "ACCOUNTING", "BUDGET", "TREASURY", "MAYOR", "ADMIN", "DEPARTMENT_HEAD", "FINANCE_HEAD", "GSO", "HR", "BAC", "SECRETARY"]),
   department: z.string().optional()
+}).refine((data) => {
+  // Department is required for REQUESTER role
+  if (data.role === "REQUESTER") {
+    return data.department && data.department.trim().length > 0
+  }
+  return true
+}, {
+  message: "Department is required for Requester role",
+  path: ["department"]
 })
 
 const updateUserSchema = z.object({
   name: z.string().min(1).optional(),
   email: z.string().email().optional(),
-  role: z.enum(["REQUESTER", "ACCOUNTING", "BUDGET", "TREASURY", "MAYOR", "ADMIN", "DEPARTMENT_HEAD", "FINANCE_HEAD", "GSO", "HR", "BAC"]).optional(),
+  role: z.enum(["REQUESTER", "ACCOUNTING", "BUDGET", "TREASURY", "MAYOR", "ADMIN", "DEPARTMENT_HEAD", "FINANCE_HEAD", "GSO", "HR", "BAC", "SECRETARY"]).optional(),
   department: z.string().optional(),
   isActive: z.boolean().optional()
+}).refine((data) => {
+  // Department is required for REQUESTER role
+  if (data.role === "REQUESTER") {
+    return data.department && data.department.trim().length > 0
+  }
+  return true
+}, {
+  message: "Department is required for Requester role",
+  path: ["department"]
 })
 
 export async function GET(request: NextRequest) {
