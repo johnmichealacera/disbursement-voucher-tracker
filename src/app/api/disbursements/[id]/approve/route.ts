@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma"
 import { z } from "zod"
 import { UserRole, VoucherStatus } from "@prisma/client"
 import { sendWorkflowNotifications } from "@/lib/workflow-notifications"
+import { getBacRequiredApprovals } from "@/lib/settings"
 
 const approvalSchema = z.object({
   status: z.enum(["APPROVED", "REJECTED"]),
@@ -147,7 +148,8 @@ export async function POST(
           const bacReviewCount = await prisma.bacReview.count({
             where: { disbursementVoucherId: id }
           })
-          const bacCompleted = bacReviewCount >= 3
+          const requiredBacReviews = await getBacRequiredApprovals()
+          const bacCompleted = bacReviewCount >= requiredBacReviews
           
           previousLevelsCompleted = secretaryApproved && mayorApproved && bacCompleted
         } else if (userApprovalLevel === 5) {
@@ -165,7 +167,8 @@ export async function POST(
           const bacReviewCount = await prisma.bacReview.count({
             where: { disbursementVoucherId: id }
           })
-          const bacCompleted = bacReviewCount >= 3
+          const requiredBacReviews = await getBacRequiredApprovals()
+          const bacCompleted = bacReviewCount >= requiredBacReviews
           
           previousLevelsCompleted = secretaryApproved && mayorApproved && bacCompleted && budgetApproved
         } else if (userApprovalLevel === 6) {
@@ -186,7 +189,8 @@ export async function POST(
           const bacReviewCount = await prisma.bacReview.count({
             where: { disbursementVoucherId: id }
           })
-          const bacCompleted = bacReviewCount >= 3
+          const requiredBacReviews = await getBacRequiredApprovals()
+          const bacCompleted = bacReviewCount >= requiredBacReviews
           
           previousLevelsCompleted = secretaryApproved && mayorApproved && bacCompleted && budgetApproved && accountingApproved
         } else {

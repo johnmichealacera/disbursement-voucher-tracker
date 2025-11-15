@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma"
 import { z } from "zod"
 import { sendWorkflowNotifications } from "@/lib/workflow-notifications"
 import { VoucherStatus } from "@prisma/client"
+import { getBacRequiredApprovals } from "@/lib/settings"
 
 const treasuryReviewSchema = z.object({
   action: z.enum(["CHECK_ISSUANCE", "MARK_RELEASED"]),
@@ -75,7 +76,8 @@ export async function POST(
         const bacReviewCount = await prisma.bacReview.count({
           where: { disbursementVoucherId: id }
         })
-        const bacCompleted = bacReviewCount >= 3
+        const requiredBacReviews = await getBacRequiredApprovals()
+        const bacCompleted = bacReviewCount >= requiredBacReviews
         
         if (!secretaryApproved || !mayorApproved || !bacCompleted || !budgetApproved || !accountingApproved) {
           return NextResponse.json({ 

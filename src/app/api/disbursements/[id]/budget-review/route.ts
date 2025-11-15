@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { z } from "zod"
 import { sendWorkflowNotifications } from "@/lib/workflow-notifications"
+import { getBacRequiredApprovals } from "@/lib/settings"
 
 const budgetReviewSchema = z.object({
   action: z.enum(["BUDGET_REVIEWED"]),
@@ -57,14 +58,15 @@ export async function POST(
 
     // Check prerequisites based on workflow type
     if (disbursement.createdBy.role === "GSO") {
-      // For GSO workflow: check if BAC has reviewed (3+ reviews)
+      // For GSO workflow: check if BAC has reviewed (required reviews)
       const bacReviewCount = await prisma.bacReview.count({
         where: { disbursementVoucherId: id }
       })
+      const requiredBacReviews = await getBacRequiredApprovals()
       
-      if (bacReviewCount < 3) {
+      if (bacReviewCount < requiredBacReviews) {
         return NextResponse.json({ 
-          error: "Budget Office can only review GSO vouchers after BAC has completed 3+ reviews" 
+          error: `Budget Office can only review GSO vouchers after BAC has completed ${requiredBacReviews}+ reviews` 
         }, { status: 400 })
       }
     } else {

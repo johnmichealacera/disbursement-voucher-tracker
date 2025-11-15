@@ -129,12 +129,13 @@ export default function DisbursementDetailPage() {
 
   const [disbursement, setDisbursement] = useState<Disbursement | null>(null)
   const [loading, setLoading] = useState(true)
+  const [bacRequiredApprovals, setBacRequiredApprovals] = useState(3) // Default to 3
   
   // Memoized progress calculation that updates when disbursement changes
   const progressSteps = useMemo(() => {
     if (!disbursement) return []
-    return calculateProgress(disbursement as unknown as Parameters<typeof calculateProgress>[0])
-  }, [disbursement])
+    return calculateProgress(disbursement as unknown as Parameters<typeof calculateProgress>[0], bacRequiredApprovals)
+  }, [disbursement, bacRequiredApprovals])
   const [error, setError] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isApproving, setIsApproving] = useState(false)
@@ -300,6 +301,24 @@ export default function DisbursementDetailPage() {
       setIsCancelling(false)
     }
   }
+
+  const fetchBacRequiredApprovals = useCallback(async () => {
+    try {
+      const response = await fetch("/api/settings/bac-required")
+      if (response.ok) {
+        const data = await response.json()
+        console.log("BAC Required Approvals fetched:", data.value)
+        if (data.value) {
+          setBacRequiredApprovals(data.value)
+        }
+      } else {
+        console.error("Failed to fetch BAC required approvals:", response.status)
+      }
+    } catch (error) {
+      console.error("Error fetching BAC required approvals:", error)
+      // Keep default value of 3
+    }
+  }, [])
 
   const fetchDisbursement = async () => {
     try {
@@ -869,10 +888,25 @@ export default function DisbursementDetailPage() {
 
   useEffect(() => {
     if (id) {
+      fetchBacRequiredApprovals()
       fetchDisbursement()
       fetchAvailableOffices()
     }
-  }, [id])
+  }, [id, fetchBacRequiredApprovals])
+
+  // Refetch BAC required approvals when page becomes visible (in case admin updated it)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        fetchBacRequiredApprovals()
+      }
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
+    }
+  }, [fetchBacRequiredApprovals])
 
   // Helper function to validate that disbursement data is complete
   const isDisbursementDataComplete = (disbursement: Disbursement) => {
@@ -1034,7 +1068,7 @@ export default function DisbursementDetailPage() {
            const mayorApproved = disbursement.approvals.some(approval => 
              approval.level === 2 && approval.status === "APPROVED"
            )
-           const bacCompleted = disbursement.bacReviews && disbursement.bacReviews.length >= 3
+           const bacCompleted = disbursement.bacReviews && disbursement.bacReviews.length >= bacRequiredApprovals
            
            return secretaryApproved && mayorApproved && bacCompleted
          } else if (effectiveApprovalLevel === 5) {
@@ -1045,7 +1079,7 @@ export default function DisbursementDetailPage() {
            const mayorApproved = disbursement.approvals.some(approval => 
              approval.level === 2 && approval.status === "APPROVED"
            )
-           const bacCompleted = disbursement.bacReviews && disbursement.bacReviews.length >= 3
+           const bacCompleted = disbursement.bacReviews && disbursement.bacReviews.length >= bacRequiredApprovals
            const budgetApproved = disbursement.approvals.some(approval => 
              approval.level === 4 && approval.status === "APPROVED"
            )
@@ -1059,7 +1093,7 @@ export default function DisbursementDetailPage() {
            const mayorApproved = disbursement.approvals.some(approval => 
              approval.level === 2 && approval.status === "APPROVED"
            )
-           const bacCompleted = disbursement.bacReviews && disbursement.bacReviews.length >= 3
+           const bacCompleted = disbursement.bacReviews && disbursement.bacReviews.length >= bacRequiredApprovals
            const budgetApproved = disbursement.approvals.some(approval => 
              approval.level === 4 && approval.status === "APPROVED"
            )
@@ -1171,11 +1205,11 @@ export default function DisbursementDetailPage() {
     bacReviews: disbursement?.bacReviews
   })
 
-  // Check if BAC has reviewed this GSO voucher (3 out of 5 members required)
+  // Check if BAC has reviewed this GSO voucher (required approvals)
   const bacHasReviewedGso = disbursement && 
     disbursement?.createdBy?.role === "GSO" &&
     disbursement.bacReviews && // Add null check
-    disbursement.bacReviews.length >= 3
+    disbursement.bacReviews.length >= bacRequiredApprovals
 
   // Budget review logic - only for GSO vouchers after BAC review
   const canBudgetReview = session.user.role === "BUDGET" && 
@@ -1198,7 +1232,7 @@ export default function DisbursementDetailPage() {
     ) && (
       // For GSO workflow: check for BAC completion (3+ reviews) and Budget not reviewed (Level 4)
       (disbursement?.createdBy?.role === "GSO" && 
-       disbursement.bacReviews && disbursement.bacReviews.length >= 3 && // BAC completed
+       disbursement.bacReviews && disbursement.bacReviews.length >= bacRequiredApprovals && // BAC completed
        !disbursement.approvals.some(approval => approval.level === 4 && approval.status === "APPROVED")) || // Budget not reviewed (Level 4 in GSO)
       // For non-GSO workflow: check for Budget not reviewed (Level 3)
       (disbursement?.createdBy?.role !== "GSO" && 
@@ -1233,7 +1267,7 @@ export default function DisbursementDetailPage() {
     (
       // For GSO workflow: check for BAC completion (3+ reviews), Budget approval (Level 4), and Accounting not reviewed (Level 5)
       (disbursement?.createdBy?.role === "GSO" && 
-       disbursement.bacReviews && disbursement.bacReviews.length >= 3 && // BAC completed
+       disbursement.bacReviews && disbursement.bacReviews.length >= bacRequiredApprovals && // BAC completed
        disbursement.approvals.some(approval => approval.level === 4 && approval.status === "APPROVED") && // Budget approved (Level 4)
        !disbursement.approvals.some(approval => approval.level === 5 && approval.status === "APPROVED")) || // Accounting not reviewed (Level 5)
       // For non-GSO workflow: check for Budget approval (Level 3) and Accounting not reviewed (Level 4)
@@ -1276,7 +1310,7 @@ export default function DisbursementDetailPage() {
     (
       // For GSO workflow: check for BAC completion (3+ reviews), Budget approval (Level 4), Accounting approval (Level 5)
       (disbursement?.createdBy?.role === "GSO" && 
-       disbursement.bacReviews && disbursement.bacReviews.length >= 3 && // BAC completed
+       disbursement.bacReviews && disbursement.bacReviews.length >= bacRequiredApprovals && // BAC completed
        disbursement.approvals.some(approval => approval.level === 4 && approval.status === "APPROVED") && // Budget approved (Level 4)
        disbursement.approvals.some(approval => approval.level === 5 && approval.status === "APPROVED")) || // Accounting approved (Level 5)
       // For non-GSO workflow: check for Budget approval (Level 3), Accounting approval (Level 4)
@@ -1308,7 +1342,7 @@ export default function DisbursementDetailPage() {
     (
       // For GSO workflow: check for BAC completion (3+ reviews), Budget approval (Level 4), Accounting approval (Level 5)
       (disbursement?.createdBy?.role === "GSO" && 
-       disbursement.bacReviews && disbursement.bacReviews.length >= 3 && // BAC completed
+       disbursement.bacReviews && disbursement.bacReviews.length >= bacRequiredApprovals && // BAC completed
        disbursement.approvals.some(approval => approval.level === 4 && approval.status === "APPROVED") && // Budget approved (Level 4)
        disbursement.approvals.some(approval => approval.level === 5 && approval.status === "APPROVED")) || // Accounting approved (Level 5)
       // For non-GSO workflow: check for Budget approval (Level 3), Accounting approval (Level 4)
@@ -1608,7 +1642,7 @@ export default function DisbursementDetailPage() {
             </Badge>
             {/* Current Reviewer Information */}
             {(() => {
-              const currentReviewer = getCurrentReviewer(disbursement)
+              const currentReviewer = getCurrentReviewer(disbursement, bacRequiredApprovals)
               return currentReviewer ? (
                 <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 border border-blue-200 rounded-lg">
                   <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
@@ -1670,14 +1704,14 @@ export default function DisbursementDetailPage() {
                         <div className="flex items-center gap-2">
                           <Eye className="h-4 w-4 text-purple-600" />
                           <span className="text-sm font-medium text-purple-800">
-                            BAC Reviews: {disbursement?.bacReviews?.length || 0}/5 members
+                            BAC Reviews: {disbursement?.bacReviews?.length || 0}/{bacRequiredApprovals} required
                           </span>
                         </div>
                         <div className="text-sm text-purple-600">
-                          {(disbursement?.bacReviews?.length || 0) >= 3 ? (
-                            <span className="text-green-600 font-medium">✓ Complete (3+ reviews)</span>
+                          {(disbursement?.bacReviews?.length || 0) >= bacRequiredApprovals ? (
+                            <span className="text-green-600 font-medium">✓ Complete ({bacRequiredApprovals}+ reviews)</span>
                           ) : (
-                            <span>Need {Math.max(3 - (disbursement?.bacReviews?.length || 0), 0)} more reviews</span>
+                            <span>Need {Math.max(bacRequiredApprovals - (disbursement?.bacReviews?.length || 0), 0)} more reviews</span>
                           )}
                         </div>
                       </div>

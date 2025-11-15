@@ -95,7 +95,6 @@ export default function CreateVoucherPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState("")
   const [offices, setOffices] = useState<string[]>([])
-  const [selectedOffice, setSelectedOffice] = useState("")
   const [payees, setPayees] = useState<PayeeOption[]>([])
   const [selectedPayeeId, setSelectedPayeeId] = useState<string>()
   const [isPayeeDialogOpen, setIsPayeeDialogOpen] = useState(false)
@@ -571,15 +570,6 @@ const handleSelectItemFromDirectory = useCallback(
     }
   }
 
-  const addSourceOffice = () => {
-    if (selectedOffice) {
-      const currentOffices = form.getValues("sourceOffice")
-      if (!currentOffices.includes(selectedOffice)) {
-        form.setValue("sourceOffice", [...currentOffices, selectedOffice])
-      }
-      setSelectedOffice("")
-    }
-  }
 
   const removeSourceOffice = (officeToRemove: string) => {
     const currentOffices = form.getValues("sourceOffice")
@@ -801,7 +791,7 @@ const handleSelectItemFromDirectory = useCallback(
                                   }
                                 />
                               </SelectTrigger>
-                              <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-md max-h-60 overflow-y-auto">
+                              <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-md max-h-60 overflow-y-auto w-[var(--radix-select-trigger-width)]">
                                 {payees.length === 0 ? (
                                   <SelectItem value="__empty" disabled className="text-sm">
                                     No payees available
@@ -829,13 +819,13 @@ const handleSelectItemFromDirectory = useCallback(
                                       <SelectItem
                                         key={payee.id}
                                         value={payee.id}
-                                        className="text-sm md:text-base py-2"
+                                        className="py-2.5 px-3"
                                       >
-                                        <div className="flex flex-col">
-                                          <span className="font-medium text-gray-900">
+                                        <div className="flex flex-col gap-1 min-w-0 w-full max-w-full overflow-hidden">
+                                          <span className="font-medium text-gray-900 text-sm truncate block w-full">
                                             {payee.name}
                                           </span>
-                                          <span className="text-xs text-gray-500">
+                                          <span className="text-xs text-gray-500 truncate block w-full">
                                             {payee.address}
                                           </span>
                                         </div>
@@ -1039,35 +1029,35 @@ const handleSelectItemFromDirectory = useCallback(
                     </FormLabel>
                     <div className="space-y-3">
                       <div className="flex gap-2">
-                        <Select value={selectedOffice} onValueChange={setSelectedOffice}>
+                        <Select 
+                          value="" 
+                          onValueChange={(value) => {
+                            const currentOffices = form.getValues("sourceOffice")
+                            if (value && !currentOffices.includes(value)) {
+                              form.setValue("sourceOffice", [...currentOffices, value])
+                            }
+                          }}
+                        >
                           <SelectTrigger className="flex-1 border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 bg-white shadow-sm">
                             <SelectValue placeholder="Select an office to add" />
                           </SelectTrigger>
                           <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-md max-h-60 overflow-y-auto">
-                            {offices.map((office) => (
-                              <SelectItem 
-                                key={office} 
-                                value={office}
-                                className="hover:bg-blue-50 focus:bg-blue-50 cursor-pointer py-2 px-3"
-                              >
-                                <div className="flex items-center space-x-2">
-                                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                                  <span className="text-gray-700">{office}</span>
-                                </div>
-                              </SelectItem>
-                            ))}
+                            {offices
+                              .filter(office => !(form.watch("sourceOffice" as any) || []).includes(office))
+                              .map((office) => (
+                                <SelectItem 
+                                  key={office} 
+                                  value={office}
+                                  className="hover:bg-blue-50 focus:bg-blue-50 cursor-pointer py-2 px-3"
+                                >
+                                  <div className="flex items-center space-x-2">
+                                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                    <span className="text-gray-700">{office}</span>
+                                  </div>
+                                </SelectItem>
+                              ))}
                           </SelectContent>
                         </Select>
-                        <Button 
-                          type="button" 
-                          onClick={addSourceOffice} 
-                          variant="outline" 
-                          size="sm"
-                          disabled={!selectedOffice}
-                          className="bg-blue-600 hover:bg-blue-700 text-white border-blue-600 hover:border-blue-700 disabled:bg-gray-300 disabled:border-gray-300 disabled:text-gray-500"
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
                       </div>
                       
                       {/* Selected Offices Display */}

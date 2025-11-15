@@ -95,7 +95,7 @@ export function getRoleDisplayName(role: string): string {
   }
 }
 
-export function getCurrentReviewer(disbursement: any): { role: string; displayName: string; status: string } | null {
+export function getCurrentReviewer(disbursement: any, bacRequiredApprovals: number = 3): { role: string; displayName: string; status: string } | null {
   if (!disbursement || !disbursement.approvals) {
     return null
   }
@@ -146,11 +146,11 @@ export function getCurrentReviewer(disbursement: any): { role: string; displayNa
 
     // Check BAC reviews
     const bacReviewCount = bacReviews ? bacReviews.length : 0
-    if (bacReviewCount < 3) {
+    if (bacReviewCount < bacRequiredApprovals) {
       return {
         role: 'BAC',
         displayName: 'BAC Committee',
-        status: `Awaiting BAC Review (${bacReviewCount}/3)`
+        status: `Awaiting BAC Review (${bacReviewCount}/${bacRequiredApprovals})`
       }
     }
 

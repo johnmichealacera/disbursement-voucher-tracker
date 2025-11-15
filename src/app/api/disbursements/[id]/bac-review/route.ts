@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { z } from "zod"
 import { sendWorkflowNotifications } from "@/lib/workflow-notifications"
+import { getBacRequiredApprovals } from "@/lib/settings"
 
 const bacReviewSchema = z.object({
   action: z.enum(["BAC_REVIEWED"]),
@@ -126,7 +127,7 @@ export async function POST(
 
     // Count total BAC reviews for this disbursement
     const totalBacReviews = disbursement.bacReviews.length + 1 // +1 for the one we just created
-    const requiredReviews = 3
+    const requiredReviews = await getBacRequiredApprovals()
 
     // Create audit trail for the BAC review
     await prisma.auditTrail.create({
@@ -147,7 +148,7 @@ export async function POST(
       }
     })
 
-    // Check if we have reached the required number of BAC reviews (3 out of 5)
+    // Check if we have reached the required number of BAC reviews
     if (totalBacReviews >= requiredReviews) {
       // BAC review is complete - no need to create approval level
       // Budget will create its own approval when it reviews
@@ -161,7 +162,7 @@ export async function POST(
         performedBy: `${totalBacReviews} BAC Members`,
         performedByRole: "BAC",
         disbursementCreatedBy: disbursement.createdBy.role,
-        remarks: `BAC review completed by ${totalBacReviews} out of 5 members`
+        remarks: `BAC review completed by ${totalBacReviews} out of ${requiredReviews} required members`
       })
     }
 

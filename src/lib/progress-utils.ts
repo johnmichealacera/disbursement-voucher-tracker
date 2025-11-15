@@ -79,7 +79,7 @@ function getBacReviewerNames(disbursement: DisbursementData): string | undefined
   return joinNames(names)
 }
 
-export function calculateProgress(disbursement: DisbursementData): ProgressStep[] {
+export function calculateProgress(disbursement: DisbursementData, bacRequiredApprovals: number = 3): ProgressStep[] {
   // Add null checks to prevent errors
   if (!disbursement || !disbursement.createdBy) {
     return []
@@ -89,7 +89,7 @@ export function calculateProgress(disbursement: DisbursementData): ProgressStep[
   const isHRWorkflow = disbursement.createdBy.role === "HR"
   
   if (isGSOWorkflow) {
-    return calculateGSOProgress(disbursement)
+    return calculateGSOProgress(disbursement, bacRequiredApprovals)
   } else if (isHRWorkflow) {
     return calculateHRProgress(disbursement)
   } else {
@@ -174,7 +174,7 @@ function calculateStandardProgress(disbursement: DisbursementData): ProgressStep
   return adjustStepStatuses(steps, disbursement.status)
 }
 
-function calculateGSOProgress(disbursement: DisbursementData): ProgressStep[] {
+function calculateGSOProgress(disbursement: DisbursementData, bacRequiredApprovals: number = 3): ProgressStep[] {
   // Add null checks
   if (!disbursement || !disbursement.approvals || !disbursement.auditTrails) {
     return []
@@ -198,35 +198,35 @@ function calculateGSOProgress(disbursement: DisbursementData): ProgressStep[] {
     {
       id: "secretary-review",
       label: "Secretary Review",
-      status: getGSOReviewStatus(disbursement, "SECRETARY_REVIEW", 12),
+      status: getGSOReviewStatus(disbursement, "SECRETARY_REVIEW", 12, bacRequiredApprovals),
       percentage: 20,
       completedBy: getApprovalNames(disbursement, 1)
     },
     {
       id: "mayor-review",
       label: "Mayor Review",
-      status: getGSOReviewStatus(disbursement, "REVIEW", 20),
+      status: getGSOReviewStatus(disbursement, "REVIEW", 20, bacRequiredApprovals),
       percentage: 33,
       completedBy: getApprovalNames(disbursement, 2)
     },
     {
       id: "bac-review",
       label: "BAC Review",
-      status: getGSOReviewStatus(disbursement, "BAC_REVIEW", 33),
+      status: getGSOReviewStatus(disbursement, "BAC_REVIEW", 33, bacRequiredApprovals),
       percentage: 50,
       completedBy: getBacReviewerNames(disbursement)
     },
     {
       id: "budget-review",
       label: "Budget Office Review",
-      status: getGSOReviewStatus(disbursement, "BUDGET_REVIEW", 50),
+      status: getGSOReviewStatus(disbursement, "BUDGET_REVIEW", 50, bacRequiredApprovals),
       percentage: 66,
       completedBy: getApprovalNames(disbursement, 4)
     },
     {
       id: "accounting-review",
       label: "Accounting Review",
-      status: getGSOReviewStatus(disbursement, "ACCOUNTING_REVIEW", 66),
+      status: getGSOReviewStatus(disbursement, "ACCOUNTING_REVIEW", 66, bacRequiredApprovals),
       percentage: 83,
       completedBy: getApprovalNames(disbursement, 5)
     },
@@ -385,7 +385,7 @@ function getStepStatus(disbursement: DisbursementData, targetStatus: string, per
   return "pending"
 }
 
-function getGSOReviewStatus(disbursement: DisbursementData, actionType: string, percentage: number): "completed" | "current" | "pending" | "rejected" | "cancelled" {
+function getGSOReviewStatus(disbursement: DisbursementData, actionType: string, percentage: number, bacRequiredApprovals: number = 3): "completed" | "current" | "pending" | "rejected" | "cancelled" {
   if (!disbursement || !disbursement.approvals || !disbursement.auditTrails) {
     return "pending"
   }
@@ -396,7 +396,7 @@ function getGSOReviewStatus(disbursement: DisbursementData, actionType: string, 
   // Special handling for BAC review - check BacReview records instead of approval levels
   if (actionType === "BAC_REVIEW") {
     const bacReviewCount = disbursement.bacReviews ? disbursement.bacReviews.length : 0
-    if (bacReviewCount >= 3) return "completed"
+    if (bacReviewCount >= bacRequiredApprovals) return "completed"
     
     // Check if Mayor has reviewed (prerequisite for BAC review) - Mayor is level 2 in GSO workflow
     const mayorHasReviewed = disbursement.approvals.some(approval => 

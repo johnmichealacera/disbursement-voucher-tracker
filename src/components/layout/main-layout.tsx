@@ -27,7 +27,8 @@ import {
   User,
   Settings,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Cog
 } from "lucide-react"
 import { NotificationBell } from "@/components/notifications/notification-bell"
 import Footer from "./footer"
@@ -72,6 +73,12 @@ const navigation = [
     name: "Directory Management",
     href: "/admin/directories",
     icon: Settings,
+    roles: ["ADMIN"]
+  },
+  {
+    name: "System Settings",
+    href: "/admin/settings",
+    icon: Cog,
     roles: ["ADMIN"]
   }
 ]
