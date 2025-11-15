@@ -6,11 +6,14 @@ interface ProgressStep {
   status: "completed" | "current" | "pending" | "rejected" | "cancelled"
   percentage: number
   completedBy?: string
+  completedAt?: string
 }
 
 interface DisbursementData {
   bacReviews: Array<{
     status: string
+    reviewedAt?: string | Date
+    createdAt?: string | Date
     reviewer?: {
       role: UserRole
       name?: string
@@ -22,9 +25,11 @@ interface DisbursementData {
     role: UserRole
     name?: string
   }
+  createdAt?: string | Date
   approvals: Array<{
     level: number
     status: string
+    approvedAt?: string | Date
     approver: {
       role: UserRole
       name?: string
@@ -32,6 +37,7 @@ interface DisbursementData {
   }>
   auditTrails: Array<{
     action: string
+    timestamp: string | Date
     user: {
       role: UserRole
       name?: string
@@ -58,6 +64,19 @@ function getApprovalNames(disbursement: DisbursementData, levels: number | numbe
   return joinNames(names)
 }
 
+function getApprovalTimestamp(disbursement: DisbursementData, levels: number | number[]): string | undefined {
+  if (!disbursement?.approvals?.length) return undefined
+  const targetLevels = Array.isArray(levels) ? levels : [levels]
+  const approvals = disbursement.approvals
+    .filter(approval => targetLevels.includes(approval.level) && approval.status === "APPROVED")
+    .sort((a, b) => {
+      const aTime = a.approvedAt ? new Date(a.approvedAt).getTime() : 0
+      const bTime = b.approvedAt ? new Date(b.approvedAt).getTime() : 0
+      return bTime - aTime // Most recent first
+    })
+  return approvals[0]?.approvedAt ? new Date(approvals[0].approvedAt).toISOString() : undefined
+}
+
 function getAuditActionNames(disbursement: DisbursementData, actions: string | string[]): string | undefined {
   if (!disbursement?.auditTrails?.length) return undefined
   const targetActions = Array.isArray(actions)
@@ -70,6 +89,21 @@ function getAuditActionNames(disbursement: DisbursementData, actions: string | s
   return joinNames(names)
 }
 
+function getAuditActionTimestamp(disbursement: DisbursementData, actions: string | string[]): string | undefined {
+  if (!disbursement?.auditTrails?.length) return undefined
+  const targetActions = Array.isArray(actions)
+    ? actions.map(action => action.toUpperCase())
+    : [actions.toUpperCase()]
+  const trails = disbursement.auditTrails
+    .filter(trail => targetActions.includes(trail.action.toUpperCase()))
+    .sort((a, b) => {
+      const aTime = a.timestamp ? new Date(a.timestamp).getTime() : 0
+      const bTime = b.timestamp ? new Date(b.timestamp).getTime() : 0
+      return bTime - aTime // Most recent first
+    })
+  return trails[0]?.timestamp ? new Date(trails[0].timestamp).toISOString() : undefined
+}
+
 function getBacReviewerNames(disbursement: DisbursementData): string | undefined {
   if (!disbursement?.bacReviews?.length) return undefined
   const names = disbursement.bacReviews
@@ -77,6 +111,21 @@ function getBacReviewerNames(disbursement: DisbursementData): string | undefined
     .map(review => review.reviewer?.name)
     .filter(Boolean) as string[]
   return joinNames(names)
+}
+
+function getBacReviewTimestamp(disbursement: DisbursementData): string | undefined {
+  if (!disbursement?.bacReviews?.length) return undefined
+  const reviews = disbursement.bacReviews
+    .filter(review => review.status === "APPROVED")
+    .sort((a, b) => {
+      const aTime = (a.reviewedAt || a.createdAt) ? new Date(a.reviewedAt || a.createdAt).getTime() : 0
+      const bTime = (b.reviewedAt || b.createdAt) ? new Date(b.reviewedAt || b.createdAt).getTime() : 0
+      return bTime - aTime // Most recent first
+    })
+  const latestReview = reviews[0]
+  if (!latestReview) return undefined
+  const timestamp = latestReview.reviewedAt || latestReview.createdAt
+  return timestamp ? new Date(timestamp).toISOString() : undefined
 }
 
 export function calculateProgress(disbursement: DisbursementData, bacRequiredApprovals: number = 3): ProgressStep[] {
@@ -109,56 +158,64 @@ function calculateStandardProgress(disbursement: DisbursementData): ProgressStep
       label: "Draft Created",
       status: "completed",
       percentage: 8,
-      completedBy: disbursement.createdBy?.name
+      completedBy: disbursement.createdBy?.name,
+      completedAt: disbursement.createdAt ? new Date(disbursement.createdAt).toISOString() : undefined
     },
     {
       id: "submitted",
       label: "Submitted for Review",
       status: disbursement.status === "DRAFT" ? "pending" : "completed",
       percentage: 16,
-      completedBy: disbursement.status === "DRAFT" ? undefined : getAuditActionNames(disbursement, "SUBMIT")
+      completedBy: disbursement.status === "DRAFT" ? undefined : getAuditActionNames(disbursement, "SUBMIT"),
+      completedAt: disbursement.status === "DRAFT" ? undefined : getAuditActionTimestamp(disbursement, "SUBMIT")
     },
     {
       id: "secretary-review",
       label: "Secretary Review",
       status: getStandardReviewStatus(disbursement, "SECRETARY_REVIEW", 16),
       percentage: 25,
-      completedBy: getApprovalNames(disbursement, 1)
+      completedBy: getApprovalNames(disbursement, 1),
+      completedAt: getApprovalTimestamp(disbursement, 1)
     },
     {
       id: "mayor-review",
       label: "Mayor Review",
       status: getStandardReviewStatus(disbursement, "REVIEW", 25),
       percentage: 40,
-      completedBy: getApprovalNames(disbursement, 2)
+      completedBy: getApprovalNames(disbursement, 2),
+      completedAt: getApprovalTimestamp(disbursement, 2)
     },
     {
       id: "budget-review",
       label: "Budget Office Review",
       status: getStandardReviewStatus(disbursement, "BUDGET_REVIEW", 40),
       percentage: 60,
-      completedBy: getApprovalNames(disbursement, 3)
+      completedBy: getApprovalNames(disbursement, 3),
+      completedAt: getApprovalTimestamp(disbursement, 3)
     },
     {
       id: "accounting-review",
       label: "Accounting Review",
       status: getStandardReviewStatus(disbursement, "ACCOUNTING_REVIEW", 60),
       percentage: 80,
-      completedBy: getApprovalNames(disbursement, 4)
+      completedBy: getApprovalNames(disbursement, 4),
+      completedAt: getApprovalTimestamp(disbursement, 4)
     },
     {
       id: "check-issuance",
       label: "Check Number Issuance",
       status: getTreasuryStatus(disbursement, "CHECK_ISSUANCE", 80),
       percentage: 90,
-      completedBy: getAuditActionNames(disbursement, "CHECK_ISSUANCE")
+      completedBy: getAuditActionNames(disbursement, "CHECK_ISSUANCE"),
+      completedAt: getAuditActionTimestamp(disbursement, "CHECK_ISSUANCE")
     },
     {
       id: "available-release",
       label: "Available for Release",
       status: getTreasuryStatus(disbursement, "AVAILABLE_RELEASE", 95),
       percentage: 95,
-      completedBy: getAuditActionNames(disbursement, ["CHECK_ISSUANCE", "MARK_RELEASED"])
+      completedBy: getAuditActionNames(disbursement, ["CHECK_ISSUANCE", "MARK_RELEASED"]),
+      completedAt: getAuditActionTimestamp(disbursement, ["CHECK_ISSUANCE", "MARK_RELEASED"])
     },
     {
       id: "released",
@@ -167,7 +224,8 @@ function calculateStandardProgress(disbursement: DisbursementData): ProgressStep
         disbursement.status === "REJECTED" ? "rejected" :
         disbursement.status === "CANCELLED" ? "cancelled" : "pending",
       percentage: 100,
-      completedBy: disbursement.status === "RELEASED" ? getAuditActionNames(disbursement, "MARK_RELEASED") : undefined
+      completedBy: disbursement.status === "RELEASED" ? getAuditActionNames(disbursement, "MARK_RELEASED") : undefined,
+      completedAt: disbursement.status === "RELEASED" ? getAuditActionTimestamp(disbursement, "MARK_RELEASED") : undefined
     }
   ]
 
@@ -186,70 +244,80 @@ function calculateGSOProgress(disbursement: DisbursementData, bacRequiredApprova
       label: "GSO Draft Created",
       status: "completed",
       percentage: 6,
-      completedBy: disbursement.createdBy?.name
+      completedBy: disbursement.createdBy?.name,
+      completedAt: disbursement.createdAt ? new Date(disbursement.createdAt).toISOString() : undefined
     },
     {
       id: "submitted",
       label: "Submitted for Review",
       status: disbursement.status === "DRAFT" ? "pending" : "completed",
       percentage: 12,
-      completedBy: disbursement.status === "DRAFT" ? undefined : getAuditActionNames(disbursement, "SUBMIT")
+      completedBy: disbursement.status === "DRAFT" ? undefined : getAuditActionNames(disbursement, "SUBMIT"),
+      completedAt: disbursement.status === "DRAFT" ? undefined : getAuditActionTimestamp(disbursement, "SUBMIT")
     },
     {
       id: "secretary-review",
       label: "Secretary Review",
       status: getGSOReviewStatus(disbursement, "SECRETARY_REVIEW", 12, bacRequiredApprovals),
       percentage: 20,
-      completedBy: getApprovalNames(disbursement, 1)
+      completedBy: getApprovalNames(disbursement, 1),
+      completedAt: getApprovalTimestamp(disbursement, 1)
     },
     {
       id: "mayor-review",
       label: "Mayor Review",
       status: getGSOReviewStatus(disbursement, "REVIEW", 20, bacRequiredApprovals),
       percentage: 33,
-      completedBy: getApprovalNames(disbursement, 2)
+      completedBy: getApprovalNames(disbursement, 2),
+      completedAt: getApprovalTimestamp(disbursement, 2)
     },
     {
       id: "bac-review",
       label: "BAC Review",
       status: getGSOReviewStatus(disbursement, "BAC_REVIEW", 33, bacRequiredApprovals),
       percentage: 50,
-      completedBy: getBacReviewerNames(disbursement)
+      completedBy: getBacReviewerNames(disbursement),
+      completedAt: getBacReviewTimestamp(disbursement)
     },
     {
       id: "budget-review",
       label: "Budget Office Review",
       status: getGSOReviewStatus(disbursement, "BUDGET_REVIEW", 50, bacRequiredApprovals),
       percentage: 66,
-      completedBy: getApprovalNames(disbursement, 4)
+      completedBy: getApprovalNames(disbursement, 4),
+      completedAt: getApprovalTimestamp(disbursement, 4)
     },
     {
       id: "accounting-review",
       label: "Accounting Review",
       status: getGSOReviewStatus(disbursement, "ACCOUNTING_REVIEW", 66, bacRequiredApprovals),
       percentage: 83,
-      completedBy: getApprovalNames(disbursement, 5)
+      completedBy: getApprovalNames(disbursement, 5),
+      completedAt: getApprovalTimestamp(disbursement, 5)
     },
     {
       id: "check-issuance",
       label: "Check Number Issuance",
       status: getTreasuryStatus(disbursement, "CHECK_ISSUANCE", 83),
       percentage: 90,
-      completedBy: getAuditActionNames(disbursement, "CHECK_ISSUANCE")
+      completedBy: getAuditActionNames(disbursement, "CHECK_ISSUANCE"),
+      completedAt: getAuditActionTimestamp(disbursement, "CHECK_ISSUANCE")
     },
     {
       id: "available-release",
       label: "Available for Release",
       status: getTreasuryStatus(disbursement, "AVAILABLE_RELEASE", 95),
       percentage: 95,
-      completedBy: getAuditActionNames(disbursement, ["CHECK_ISSUANCE", "MARK_RELEASED"])
+      completedBy: getAuditActionNames(disbursement, ["CHECK_ISSUANCE", "MARK_RELEASED"]),
+      completedAt: getAuditActionTimestamp(disbursement, ["CHECK_ISSUANCE", "MARK_RELEASED"])
     },
     {
       id: "released",
       label: "Released",
       status: getTreasuryStatus(disbursement, "RELEASED", 100),
       percentage: 100,
-      completedBy: getAuditActionNames(disbursement, "MARK_RELEASED")
+      completedBy: getAuditActionNames(disbursement, "MARK_RELEASED"),
+      completedAt: getAuditActionTimestamp(disbursement, "MARK_RELEASED")
     }
   ]
 
@@ -269,65 +337,74 @@ function calculateHRProgress(disbursement: DisbursementData): ProgressStep[] {
       label: "HR Draft Created",
       status: "completed",
       percentage: 8,
-      completedBy: disbursement.createdBy?.name
+      completedBy: disbursement.createdBy?.name,
+      completedAt: disbursement.createdAt ? new Date(disbursement.createdAt).toISOString() : undefined
     },
     {
       id: "submitted",
       label: "Submitted for Review",
       status: disbursement.status === "DRAFT" ? "pending" : "completed",
       percentage: 16,
-      completedBy: disbursement.status === "DRAFT" ? undefined : getAuditActionNames(disbursement, "SUBMIT")
+      completedBy: disbursement.status === "DRAFT" ? undefined : getAuditActionNames(disbursement, "SUBMIT"),
+      completedAt: disbursement.status === "DRAFT" ? undefined : getAuditActionTimestamp(disbursement, "SUBMIT")
     },
     {
       id: "secretary-review",
       label: "Secretary Review",
       status: getStandardReviewStatus(disbursement, "SECRETARY_REVIEW", 16),
       percentage: 25,
-      completedBy: getApprovalNames(disbursement, 1)
+      completedBy: getApprovalNames(disbursement, 1),
+      completedAt: getApprovalTimestamp(disbursement, 1)
     },
     {
       id: "mayor-review",
       label: "Mayor Review",
       status: getStandardReviewStatus(disbursement, "REVIEW", 25),
       percentage: 40,
-      completedBy: getApprovalNames(disbursement, 2)
+      completedBy: getApprovalNames(disbursement, 2),
+      completedAt: getApprovalTimestamp(disbursement, 2)
     },
     {
       id: "budget-review",
       label: "Budget Office Review",
       status: getStandardReviewStatus(disbursement, "BUDGET_REVIEW", 40),
       percentage: 60,
-      completedBy: getApprovalNames(disbursement, 3)
+      completedBy: getApprovalNames(disbursement, 3),
+      completedAt: getApprovalTimestamp(disbursement, 3)
     },
     {
       id: "accounting-review",
       label: "Accounting Review",
       status: getStandardReviewStatus(disbursement, "ACCOUNTING_REVIEW", 60),
       percentage: 80,
-      completedBy: getApprovalNames(disbursement, 4)
+      completedBy: getApprovalNames(disbursement, 4),
+      completedAt: getApprovalTimestamp(disbursement, 4)
     },
     {
       id: "check-issuance",
       label: "Check Number Issuance",
       status: getTreasuryStatus(disbursement, "CHECK_ISSUANCE", 80),
       percentage: 90,
-      completedBy: getAuditActionNames(disbursement, "CHECK_ISSUANCE")
+      completedBy: getAuditActionNames(disbursement, "CHECK_ISSUANCE"),
+      completedAt: getAuditActionTimestamp(disbursement, "CHECK_ISSUANCE")
     },
     {
       id: "available-release",
       label: "Available for Release",
       status: getTreasuryStatus(disbursement, "AVAILABLE_RELEASE", 95),
       percentage: 95,
-      completedBy: getAuditActionNames(disbursement, ["CHECK_ISSUANCE", "MARK_RELEASED"])
+      completedBy: getAuditActionNames(disbursement, ["CHECK_ISSUANCE", "MARK_RELEASED"]),
+      completedAt: getAuditActionTimestamp(disbursement, ["CHECK_ISSUANCE", "MARK_RELEASED"])
     },
     {
       id: "released",
       label: "Released",
       status: disbursement.status === "RELEASED" ? "completed" : 
-              disbursement.status === "REJECTED" ? "rejected" :
-              disbursement.status === "CANCELLED" ? "cancelled" : "pending",
+        disbursement.status === "REJECTED" ? "rejected" :
+        disbursement.status === "CANCELLED" ? "cancelled" : "pending",
       percentage: 100,
-      completedBy: disbursement.status === "RELEASED" ? getAuditActionNames(disbursement, "MARK_RELEASED") : undefined
+      completedBy: disbursement.status === "RELEASED" ? getAuditActionNames(disbursement, "MARK_RELEASED") : undefined,
+      completedAt: disbursement.status === "RELEASED" ? getAuditActionTimestamp(disbursement, "MARK_RELEASED") : undefined
     }
   ]
 

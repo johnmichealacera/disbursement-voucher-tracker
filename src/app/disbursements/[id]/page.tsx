@@ -55,7 +55,9 @@ import {
   MessageSquare,
   Wallet,
   X,
-  Ban
+  Ban,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react"
 import { BacReview } from "@prisma/client"
 
@@ -168,6 +170,7 @@ export default function DisbursementDetailPage() {
   const [cancelReason, setCancelReason] = useState("")
   const [cancelError, setCancelError] = useState("")
   const [isCancelling, setIsCancelling] = useState(false)
+  const [showAllActivities, setShowAllActivities] = useState(false)
 
   useEffect(() => {
     if (disbursement?.releaseRecipient) {
@@ -2075,14 +2078,36 @@ export default function DisbursementDetailPage() {
             {/* Audit Trail */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Clock className="mr-2 h-5 w-5" />
-                  Activity Log
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center">
+                    <Clock className="mr-2 h-5 w-5" />
+                    Activity Log
+                  </CardTitle>
+                  {disbursement.auditTrails.length > 10 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowAllActivities(!showAllActivities)}
+                      className="text-xs"
+                    >
+                      {showAllActivities ? (
+                        <>
+                          <ChevronUp className="h-4 w-4 mr-1" />
+                          Show Less
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown className="h-4 w-4 mr-1" />
+                          Show All ({disbursement.auditTrails.length})
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {disbursement.auditTrails.slice(0, 10).map((trail) => {
+                  {(showAllActivities ? disbursement.auditTrails : disbursement.auditTrails.slice(0, 10)).map((trail) => {
                     const getActionDescription = (action: string, trail: { newValues?: { checkNumber?: string; releaseDate?: string; releaseRecipient?: string; treasuryActionComments?: string; cancellationReason?: string } }) => {
                       switch (action.toUpperCase()) {
                         case "CREATE": return "created the disbursement"
@@ -2222,11 +2247,6 @@ export default function DisbursementDetailPage() {
                       </div>
                     )
                   })}
-                  {disbursement.auditTrails.length > 10 && (
-                    <p className="text-xs text-gray-500 text-center">
-                      Showing latest 10 activities of {disbursement.auditTrails.length} total
-                    </p>
-                  )}
                 </div>
               </CardContent>
             </Card>

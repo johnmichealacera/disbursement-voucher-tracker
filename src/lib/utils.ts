@@ -39,6 +39,35 @@ export function formatDateTime(date: Date | string): string {
   }).format(d)
 }
 
+export function formatTimeDifference(startDate: Date | string, endDate: Date | string): string {
+  const start = typeof startDate === 'string' ? new Date(startDate) : startDate
+  const end = typeof endDate === 'string' ? new Date(endDate) : endDate
+  
+  const diffMs = end.getTime() - start.getTime()
+  const diffMinutes = Math.floor(diffMs / (1000 * 60))
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+  
+  if (diffDays > 0) {
+    return `${diffDays} day${diffDays > 1 ? 's' : ''}`
+  } else if (diffHours > 0) {
+    return `${diffHours} hour${diffHours > 1 ? 's' : ''}`
+  } else if (diffMinutes > 0) {
+    return `${diffMinutes} minute${diffMinutes > 1 ? 's' : ''}`
+  } else {
+    return 'Less than a minute'
+  }
+}
+
+export function getTotalProcessingTime(createdAt: Date | string, updatedAt?: Date | string): string {
+  const start = typeof createdAt === 'string' ? new Date(createdAt) : createdAt
+  const end = updatedAt 
+    ? (typeof updatedAt === 'string' ? new Date(updatedAt) : updatedAt)
+    : new Date() // Use current time if no updatedAt
+  
+  return formatTimeDifference(start, end)
+}
+
 export function getStatusColor(status: string | undefined | null): string {
   if (!status) {
     return 'bg-gray-100 text-gray-800'

@@ -10,6 +10,7 @@ interface Disbursement {
   amount: number
   status: string
   createdAt: string
+  updatedAt?: string
   createdBy: {
     name: string
     department?: string

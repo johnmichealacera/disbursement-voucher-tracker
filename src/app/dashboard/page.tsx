@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { formatCurrency, formatDate, getStatusColor, getCurrentReviewer } from "@/lib/utils"
+import { formatCurrency, formatDate, getStatusColor, getCurrentReviewer, getTotalProcessingTime } from "@/lib/utils"
 import { MainLayout } from "@/components/layout/main-layout"
 import Link from "next/link"
 import {
@@ -38,6 +38,7 @@ interface RecentVoucher {
   amount: number
   status: string
   createdAt: string
+  updatedAt?: string
   createdBy: {
     name: string
     department?: string
@@ -67,7 +68,7 @@ interface RecentVoucher {
 
 export default function DashboardPage() {
   const { data: session } = useSession()
-  const { data: stats, isLoading: statsLoading, error: statsError } = useDashboardStats()
+  const { data: stats, isLoading: statsLoading } = useDashboardStats()
   const { data: recentVouchers, isLoading: recentLoading, error: recentError } = useRecentDisbursements()
 
   if (!session) {
@@ -308,6 +309,12 @@ export default function DashboardPage() {
                             </div>
                             <div className="text-sm text-gray-500">
                               <span className="text-gray-400">Created by:</span> {voucher.createdBy.name} • {formatDate(voucher.createdAt)}
+                            </div>
+                            <div className="flex items-center gap-2 mt-2">
+                              <Clock className="h-3.5 w-3.5 text-amber-600" />
+                              <span className="text-xs font-medium text-amber-700">
+                                Processing: {getTotalProcessingTime(voucher.createdAt, voucher.updatedAt)}
+                              </span>
                             </div>
                           </div>
                           {/* Current Reviewer Information */}

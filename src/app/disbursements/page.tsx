@@ -24,8 +24,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { formatCurrency, formatDate, getStatusColor, getCurrentReviewer } from "@/lib/utils"
-import { FileText, Plus, Search, Filter, Eye } from "lucide-react"
+import { formatCurrency, formatDate, getStatusColor, getCurrentReviewer, getTotalProcessingTime } from "@/lib/utils"
+import { FileText, Plus, Search, Filter, Eye, Clock } from "lucide-react"
 import { useDisbursements } from "@/hooks/use-data"
 import { useDebounce } from "@/hooks/use-debounce"
 import { TableSkeleton } from "@/components/ui/skeletons"
@@ -37,6 +37,7 @@ interface Disbursement {
   amount: number
   status: string
   createdAt: string
+  updatedAt?: string
   createdBy: {
     name: string
     department?: string
@@ -311,6 +312,7 @@ function DisbursementsContent() {
                     <TableHead>Amount</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="hidden md:table-cell">Current Reviewer</TableHead>
+                    <TableHead className="hidden lg:table-cell">Processing Time</TableHead>
                     <TableHead className="hidden sm:table-cell">Requester</TableHead>
                     <TableHead className="hidden lg:table-cell">Created</TableHead>
                     <TableHead>Actions</TableHead>
@@ -352,6 +354,14 @@ function DisbursementsContent() {
                             <div className="text-sm text-gray-500">Completed</div>
                           )
                         })()}
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell">
+                        <div className="flex items-center gap-1.5">
+                          <Clock className="h-3.5 w-3.5 text-amber-600" />
+                          <span className="text-xs font-medium text-amber-700">
+                            {getTotalProcessingTime(disbursement.createdAt, disbursement.updatedAt)}
+                          </span>
+                        </div>
                       </TableCell>
                       <TableCell className="hidden sm:table-cell">
                         <div className="text-sm">{disbursement.createdBy.name}</div>
