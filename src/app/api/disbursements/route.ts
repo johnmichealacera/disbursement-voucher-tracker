@@ -187,6 +187,7 @@ export async function GET(request: NextRequest) {
           },
           bacReviews: {
             select: {
+              status: true,
               reviewer: {
                 select: {
                   name: true,

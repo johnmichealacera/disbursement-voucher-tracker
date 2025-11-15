@@ -1009,8 +1009,8 @@ export default function DisbursementDetailPage() {
     (disbursement.createdBy.id === session.user.id || ["ADMIN", "GSO", "HR"].includes(session.user.role))
 
   const cancellableStatuses = ["PENDING", "VALIDATED", "APPROVED"]
-  const canCancel = cancellableStatuses.includes(disbursement.status) &&
-    (disbursement.createdBy.id === session.user.id || ["ADMIN", "ACCOUNTING", "BUDGET", "TREASURY", "MAYOR", "DEPARTMENT_HEAD", "FINANCE_HEAD"].includes(session.user.role))
+  // Only system administrators can cancel disbursements
+  const canCancel = cancellableStatuses.includes(disbursement.status) && session.user.role === "ADMIN"
 
   // Determine approval permissions based on role and current status
   const getApprovalLevel = (role: string): number | null => {

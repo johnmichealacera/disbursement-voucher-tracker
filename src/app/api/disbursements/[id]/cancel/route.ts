@@ -106,20 +106,9 @@ export async function POST(
       return NextResponse.json({ error: "Disbursement not found" }, { status: 404 })
     }
 
-    const isCreator = disbursement.createdById === session.user.id
-    const allowedRoles = [
-      "ADMIN",
-      "ACCOUNTING",
-      "BUDGET",
-      "TREASURY",
-      "MAYOR",
-      "DEPARTMENT_HEAD",
-      "FINANCE_HEAD"
-    ]
-    const canCancel = isCreator || allowedRoles.includes(session.user.role)
-
-    if (!canCancel) {
-      return NextResponse.json({ error: "Access denied" }, { status: 403 })
+    // Only system administrators can cancel disbursements
+    if (session.user.role !== "ADMIN") {
+      return NextResponse.json({ error: "Only system administrators can cancel disbursements" }, { status: 403 })
     }
 
     if (["RELEASED", "REJECTED", "CANCELLED"].includes(disbursement.status)) {

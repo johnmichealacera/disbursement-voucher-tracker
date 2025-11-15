@@ -55,6 +55,7 @@ interface Disbursement {
     }
   }>
   bacReviews?: Array<{
+    status: string
     reviewer: {
       name: string
       role: string
@@ -88,6 +89,7 @@ function DisbursementsContent() {
   const [endDateFilter, setEndDateFilter] = useState("")
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
+  const [bacRequiredApprovals, setBacRequiredApprovals] = useState(3)
 
   // Debounce search term to avoid too many API calls
   const debouncedSearchTerm = useDebounce(searchTerm, 500)
@@ -110,6 +112,24 @@ function DisbursementsContent() {
 
   const disbursements = data?.disbursements || []
   const pagination = data?.pagination || null
+
+  // Fetch BAC required approvals setting
+  useEffect(() => {
+    const fetchBacRequiredApprovals = async () => {
+      try {
+        const response = await fetch("/api/settings/bac-required")
+        if (response.ok) {
+          const data = await response.json()
+          if (data.value) {
+            setBacRequiredApprovals(data.value)
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching BAC required approvals:", error)
+      }
+    }
+    fetchBacRequiredApprovals()
+  }, [])
 
   const handleStatusFilter = (status: string) => {
     const actualStatus = status === "ALL" ? "" : status
@@ -341,7 +361,7 @@ function DisbursementsContent() {
                       </TableCell>
                       <TableCell className="hidden md:table-cell">
                         {(() => {
-                          const currentReviewer = getCurrentReviewer(disbursement)
+                          const currentReviewer = getCurrentReviewer(disbursement, bacRequiredApprovals)
                           return currentReviewer ? (
                             <div className="flex items-center space-x-2">
                               <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>

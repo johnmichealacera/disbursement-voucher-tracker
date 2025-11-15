@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client"
 
+import { useEffect, useState } from "react"
 import { useSession } from "next-auth/react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -53,6 +54,7 @@ interface RecentVoucher {
     }
   }>
   bacReviews?: Array<{
+    status: string
     reviewer: {
       name: string
       role: string
@@ -70,6 +72,25 @@ export default function DashboardPage() {
   const { data: session } = useSession()
   const { data: stats, isLoading: statsLoading } = useDashboardStats()
   const { data: recentVouchers, isLoading: recentLoading, error: recentError } = useRecentDisbursements()
+  const [bacRequiredApprovals, setBacRequiredApprovals] = useState(3)
+
+  // Fetch BAC required approvals setting
+  useEffect(() => {
+    const fetchBacRequiredApprovals = async () => {
+      try {
+        const response = await fetch("/api/settings/bac-required")
+        if (response.ok) {
+          const data = await response.json()
+          if (data.value) {
+            setBacRequiredApprovals(data.value)
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching BAC required approvals:", error)
+      }
+    }
+    fetchBacRequiredApprovals()
+  }, [])
 
   if (!session) {
     return null
@@ -319,7 +340,7 @@ export default function DashboardPage() {
                           </div>
                           {/* Current Reviewer Information */}
                           {(() => {
-                            const currentReviewer = getCurrentReviewer(voucher)
+                            const currentReviewer = getCurrentReviewer(voucher, bacRequiredApprovals)
                             return currentReviewer ? (
                               <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                                 <div className="flex items-center space-x-2">

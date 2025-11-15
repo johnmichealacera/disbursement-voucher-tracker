@@ -173,8 +173,9 @@ export function getCurrentReviewer(disbursement: any, bacRequiredApprovals: numb
       }
     }
 
-    // Check BAC reviews
-    const bacReviewCount = bacReviews ? bacReviews.length : 0
+    // Check BAC reviews - only count approved reviews
+    const approvedBacReviews = bacReviews ? bacReviews.filter((review: any) => review.status === 'APPROVED') : []
+    const bacReviewCount = approvedBacReviews.length
     if (bacReviewCount < bacRequiredApprovals) {
       return {
         role: 'BAC',
